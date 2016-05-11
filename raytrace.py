@@ -1,13 +1,16 @@
 import numpy as np
 import xlrd
 import astropy.units as u
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, RectBivariateSpline
+
 
 import marxs
 import marxs.optics
 from marxs.simulator import Sequence
 from marxs.source import PointSource, FixedPointing
 from marxs.optics import EnergyFilter, FlatDetector
+
+from read_grating_data import InterpolateRalfTable
 
 # Reading in data for grating reflectivity, filtercurves etc.
 arcusefficiencytable = xlrd.open_workbook('ArcusEffectiveArea-v3.xls')
@@ -35,6 +38,8 @@ rms = marxs.optics.RadialMirrorScatter(inplanescatter=(24 * u.arcsec).to(u.radia
                                        perpplanescatter=(1.05 * u.arcsec).to(u.radian).value,
                                        position=entrancepos)
 mirr = Sequence(sequence=[lens, rms, mirrorefficiency])
+
+order_selector = InterpolateRalfTable('Si_4um_deep_30pct_dc.xlsx')
 
 
 det = marxs.optics.FlatStack(zoom=1000, sequence=[EnergyFilter, FlatDetector], keywords=[{'filterfunc': interp1d(energy, sifiltercurve * uvblocking * opticalblocking * ccdcontam * qebiccd)}, {}])
