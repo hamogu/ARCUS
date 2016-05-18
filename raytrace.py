@@ -11,12 +11,10 @@ from marxs.source import PointSource, FixedPointing
 from marxs.optics import EnergyFilter, FlatDetector, CATGrating
 from marxs.design.rowland import RowlandTorus, design_tilted_torus, GratingArrayStructure
 
-from ralfgrating import Efficiency191
-
 from read_grating_data import InterpolateRalfTable
 
 # Reading in data for grating reflectivity, filtercurves etc.
-arcusefficiencytable = xlrd.open_workbook('../ArcusEffectiveArea-v3.xls')
+arcusefficiencytable = xlrd.open_workbook('ArcusEffectiveArea-v3.xls')
 mastersheet = arcusefficiencytable.sheet_by_name('Master')
 energy = np.array(mastersheet.col_values(0, start_rowx=6)) / 1000.  # ev to keV
 spogeometricthroughput = np.array(mastersheet.col_values(3, start_rowx=6))
@@ -42,6 +40,14 @@ rms = marxs.optics.RadialMirrorScatter(inplanescatter=(24 * u.arcsec).to(u.radia
                                        position=entrancepos)
 mirror = Sequence(sequence=[lens, rms, mirrorefficiency])
 
+# CAT grating
+order_selector = InterpolateRalfTable('Si_4um_deep_30pct_dc.xlsx')
+
+# Define L1, L2 blockage as simple filters due to geometric area
+# L1 support: blocks 18 %
+# L2 support: blocks 19 %
+catsupport = EnergyFilter(filterfunc=lambda e: 0.81 * 0.82)
+
 R, r, pos4d = rowland_pars = design_tilted_torus(12e3, 2 * np.deg2rad(1.91),
                                                  5 * np.deg2rad(1.91))
 rowland = RowlandTorus(R, r, pos4d=pos4d)
@@ -49,17 +55,15 @@ gas = GratingArrayStructure(rowland, d_facet=22., x_range=[1e4, 1.2e4],
                             radius=[300, 400], phi=[0, 2. * np.pi],
                             elem_class=CATGrating,
                             elem_args={'d': 2e-4, 'zoom': 10.,
-                                       'order_selector': Efficiency191},
+                                       'order_selector': order_selector},
                             )
-
-order_selector = InterpolateRalfTable('Si_4um_deep_30pct_dc.xlsx')
 
 
 det = marxs.optics.FlatStack(zoom=1000,
                              sequence=[EnergyFilter, FlatDetector],
                              keywords=[{'filterfunc': interp1d(energy, sifiltercurve * uvblocking * opticalblocking * ccdcontam * qebiccd)}, {}])
 
-arcus = Sequence(sequence=[pointing, aper, mirror, gas, det])
+arcus = Sequence(sequence=[pointing, aper, mirror, gas, catsupport, det])
 
 photons = star.generate_photons(exposuretime=5000)
 p = arcus(photons)

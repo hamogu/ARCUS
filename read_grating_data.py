@@ -1,4 +1,4 @@
-import numpp as np
+import numpy as np
 import astropy.units as u
 from scipy.interpolate import RectBivariateSpline
 from openpyxl import load_workbook
@@ -51,7 +51,7 @@ class InterpolateRalfTable(object):
 
         n_wave = len(set(wave))
         n_theta = len(set(theta))
-        if data.shape != (len(orders), n_wave * n_theta):
+        if data.shape != (len(self.orders), n_wave * n_theta):
             raise DataFileFormatException('Check file format.')
 
         # This really is 3d data in (wave, n_theta, order) space.
@@ -59,11 +59,11 @@ class InterpolateRalfTable(object):
 
         wave = wave[::n_theta]
         theta = np.deg2rad(theta[:n_theta])
-        data = data.reshape((len(orders), n_wave, n_theta))
+        data = data.reshape((len(self.orders), n_wave, n_theta))
 
         # Order is int, we will never interpolate about order, thus, we'll just have
         # len(order) 2d interpolations
-        self.interpolators = [RectBivariateSpline(wave, theta, data[i, :,:], kx=k, ky=k) for i in range(len(orders))]
+        self.interpolators = [RectBivariateSpline(wave, theta, data[i, :,:], kx=k, ky=k) for i in range(len(self.orders))]
 
     def __call__(self, energies, pol, blaze):
         # convert energy in keV to wavelength in nm (the unit of the input table)
