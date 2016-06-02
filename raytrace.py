@@ -8,8 +8,10 @@ import marxs
 import marxs.optics
 from marxs.simulator import Sequence
 from marxs.source import PointSource, FixedPointing
-from marxs.optics import GlobalEnergyFilter, EnergyFilter, FlatDetector, CATGrating
-from marxs.design.rowland import RowlandTorus, design_tilted_torus, GratingArrayStructure
+from marxs.optics import (GlobalEnergyFilter, EnergyFilter,
+                          FlatDetector, CATGrating)
+from marxs.design.rowland import (RowlandTorus, design_tilted_torus,
+                                  GratingArrayStructure, LinearCCDArray)
 
 from read_grating_data import InterpolateRalfTable
 
@@ -52,12 +54,12 @@ order_selector = InterpolateRalfTable('../Si_4um_deep_30pct_dc.xlsx')
 catsupport = GlobalEnergyFilter(filterfunc=lambda e: 0.81 * 0.82)
 
 blazeang = 1.91
-R, r, pos4d = rowland_pars = design_tilted_torus(12e3, np.deg2rad(blazeang),
+R, r, pos4d = design_tilted_torus(12e3, np.deg2rad(blazeang),
                                                  2 * np.deg2rad(blazeang))
 rowland = RowlandTorus(R, r, pos4d=pos4d)
 blazemat = transforms3d.axangles.axangle2mat(np.array([0, 1, 0]), np.deg2rad(blazeang))
 mytorus = RowlandTorus(R, r, pos4d=pos4d)
-gas = GratingArrayStructure(rowland, d_facet=22., x_range=[1e4, 1.4e4],
+gas = GratingArrayStructure(rowland=rowland, d_element=22., x_range=[1e4, 1.4e4],
                             radius=[50, 300], phi=[0, 2. * np.pi],
                             elem_class=CATGrating,
                             elem_args={'d': 2e-4, 'zoom': [1., 10., 10.], 'orientation': blazemat,
@@ -65,12 +67,25 @@ gas = GratingArrayStructure(rowland, d_facet=22., x_range=[1e4, 1.4e4],
                             )
 
 
-det = marxs.optics.FlatStack(zoom=[1, 1000, 1000],
-                             elements=[EnergyFilter, FlatDetector],
-                             keywords=[{'filterfunc': interp1d(energy, sifiltercurve * uvblocking * opticalblocking * ccdcontam * qebiccd)}, {}])
+flatstackargs = {'zoom': [1, 24.576, 12.288],
+                 'elements': [EnergyFilter, FlatDetector],
+                 'keywords': [{'filterfunc': interp1d(energy, sifiltercurve * uvblocking * opticalblocking * ccdcontam * qebiccd)}, {'pixsize': 0.024}]
+                 }
+# 500 mu gap between detectors
+det = LinearCCDArray(rowland=mytorus, elem_class=marxs.optics.FlatStack,
+                     elem_args=flatstackargs, d_element=49.652, phi=0,
+                     x_range=[0, 200], radius=[-1000, -400])
+
+# Place an additional detector in the focal plane for comparison
+# Detectors are transparent to allow this stuff
+detfp = FlatDetector(zoom=[.2, 1000, 1000])
+detfp.loc_coos_name = ['detfp_x', 'detfp_y']
+detfp.detpix_name = ['detfppix_x', 'detfppix_y']
+detfp.display['opacity'] = 0.2
+
 
 keeppos = marxs.simulator.KeepCol('pos')
-arcus = Sequence(elements=[aper, mirror, gas, catsupport, det], postprocess_steps=[keeppos])
+arcus = Sequence(elements=[aper, mirror, gas, catsupport, det, detfp], postprocess_steps=[keeppos])
 
 star = PointSource(coords=(23., 45.), flux=5.)
 photons = star.generate_photons(exposuretime=200)
@@ -90,3 +105,8 @@ d = h2e(d)
 
 marxs.visualization.mayavi.plot_rays(d, viewer=fig)
 arcus.plot(format="mayavi", viewer=fig)
+
+theta, phi = np.mgrid[-0.2+np.pi:0.2+np.pi:60j, -1:1:60j]
+mytorus.plot(theta=theta, phi=phi, viewer=fig, format='mayavi')
+
+from marxs.analysis import fwhm_per_order, weighted_per_order
