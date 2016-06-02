@@ -10,7 +10,7 @@ from marxs.math.pluecker import h2e
 import marxs.visualization.mayavi
 
 
-from .arcus import rowland, aper, mirror, gas, catsupport, det
+from arcus import rowland, aper, mirror, gas, catsupport, det
 
 # Place an additional detector in the focal plane for comparison
 # Detectors are transparent to allow this stuff
@@ -38,7 +38,7 @@ d = np.dstack(keeppos.data)
 d = np.swapaxes(d, 1, 2)
 d = h2e(d)
 
-marxs.visualization.mayavi.plot_rays(d, viewer=fig)
+marxs.visualization.mayavi.plot_rays(d, scalar=p['energy'], viewer=fig)
 arcus.plot(format="mayavi", viewer=fig)
 
 theta, phi = np.mgrid[-0.2 + np.pi:0.2 + np.pi:60j, -1:1:60j]
