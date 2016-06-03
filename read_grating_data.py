@@ -3,6 +3,7 @@ import astropy.units as u
 from scipy.interpolate import RectBivariateSpline
 from openpyxl import load_workbook
 
+
 class DataFileFormatException(Exception):
     pass
 
@@ -59,22 +60,50 @@ class InterpolateRalfTable(object):
 
         wave = wave[::n_theta]
         theta = np.deg2rad(theta[:n_theta])
-        data = data.reshape((len(self.orders), n_wave, n_theta))
+        self.data = data.reshape((len(self.orders), n_wave, n_theta))
 
         # Order is int, we will never interpolate about order, thus, we'll just have
         # len(order) 2d interpolations
-        self.interpolators = [RectBivariateSpline(wave, theta, data[i, :,:], kx=k, ky=k) for i in range(len(self.orders))]
+        self.interpolators = [RectBivariateSpline(wave, theta, self.data[i, :,:], kx=k, ky=k) for i in range(len(self.orders))]
 
-    def __call__(self, energies, pol, blaze):
-        # convert energy in keV to wavelength in nm (the unit of the input table)
+    def probabilities(self, energies, pol, blaze):
+        '''Obtain the probabilties for photons to go into a particular order.
+
+        This has the same parameters as the ``__call__`` method, but it returns
+        the raw probabilities, while ``__call__`` will draw from these
+        probabilities and assign an order and a total survival probability to
+        each photon.
+
+        Parameters
+        ----------
+        energies : np.array
+            Energy for each photons
+        pol : np.array
+            Polarization for each photon (not used in this class)
+        blaze : np.array
+            Blaze angle for each photon
+
+        Returns
+        -------
+        orders : np.array
+            Array of orders
+        interpprobs : np.array
+            This array contains a probability array for each photon to reach a
+            particular order
+        '''
+        # convert energy in keV to wavelength in nm
+        # (nm is the unit of the input table)
         wave = (energies * u.keV).to(u.nm, equivalencies=u.spectral()).value
         interpprobs = np.empty((len(self.orders), len(energies)))
         for i, interp in enumerate(self.interpolators):
             interpprobs[i, :] = interp.ev(wave, blaze)
+        return self.orders, interpprobs
 
+    def __call__(self, energies, pol, blaze):
+        orders, interpprobs = self.probabilities(energies, pol, blaze)
         totalprob = np.sum(interpprobs, axis=0)
         # Cumulative probability for orders, normalized to 1.
         cumprob = np.cumsum(interpprobs, axis=0) / totalprob
         ind_orders = np.argmax(cumprob > np.random.rand(len(energies)), axis=0)
 
-        return self.orders[ind_orders], totalprob
+        return orders[ind_orders], totalprob
