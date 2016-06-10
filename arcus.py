@@ -2,15 +2,14 @@ import os
 
 import numpy as np
 import xlrd
-import astropy.units as u
 from scipy.interpolate import interp1d
 import transforms3d
 
 import marxs
-import marxs.optics
 from marxs.simulator import Sequence
 from marxs.optics import (GlobalEnergyFilter, EnergyFilter,
-                          FlatDetector, CATGrating)
+                          FlatDetector, CATGrating,
+                          CircleAperture, PerfectLens, RadialMirrorScatter)
 from marxs.design.rowland import (RowlandTorus, design_tilted_torus,
                                   GratingArrayStructure, LinearCCDArray)
 
@@ -38,16 +37,19 @@ entrancepos = np.array([12000., 0., 0.])
 # Set a little above entrance pos (the mirror) for display purposes.
 # Thus, needs to be geometrically bigger for off-axis sources.
 
-aper = marxs.optics.CircleAperture(position=[12200, 0, 0], zoom=300, phi=[-0.3+np.pi/2, .3+np.pi/2])
-lens = marxs.optics.PerfectLens(focallength=12000., position=entrancepos)
-rms = marxs.optics.RadialMirrorScatter(inplanescatter=(24 * u.arcsec).to(u.radian).value,
-                                       perpplanescatter=(1.05 * u.arcsec).to(u.radian).value,
-                                       position=entrancepos)
+aper = CircleAperture(position=[12200, 0, 0], zoom=300,
+                      phi=[-0.3 + np.pi / 2, .3 + np.pi / 2])
+lens = PerfectLens(focallength=12000., position=entrancepos)
+# Scatter as FWHM ~8 arcsec. Divide by 2.3545 to get Gaussian sigma.
+rms = RadialMirrorScatter(inplanescatter=8. / 2.3545 / 3600 / 180. * np.pi,
+                          perpplanescatter=1. / 2.345 / 3600. / 180. * np.pi,
+                          position=entrancepos)
 
 mirror = Sequence(elements=[lens, rms, mirrorefficiency])
 
 # CAT grating
-order_selector = InterpolateRalfTable(os.path.join(path, '../Si_4um_deep_30pct_dc.xlsx'))
+ralfdata = os.path.join(path, '../Si_4um_deep_30pct_dc.xlsx')
+order_selector = InterpolateRalfTable(ralfdata)
 
 # Define L1, L2 blockage as simple filters due to geometric area
 # L1 support: blocks 18 %
@@ -55,10 +57,12 @@ order_selector = InterpolateRalfTable(os.path.join(path, '../Si_4um_deep_30pct_d
 catsupport = GlobalEnergyFilter(filterfunc=lambda e: 0.81 * 0.82)
 
 blazeang = 1.91
+
 R, r, pos4d = design_tilted_torus(12e3, np.deg2rad(blazeang),
                                   2 * np.deg2rad(blazeang))
 rowland = RowlandTorus(R, r, pos4d=pos4d)
-blazemat = transforms3d.axangles.axangle2mat(np.array([0, 1, 0]), np.deg2rad(blazeang))
+
+blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(blazeang))
 gas = GratingArrayStructure(rowland=rowland, d_element=30.,
                             x_range=[1e4, 1.4e4],
                             radius=[50, 300], phi=[-0.3+np.pi/2, .3+np.pi/2],

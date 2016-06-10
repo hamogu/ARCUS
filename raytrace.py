@@ -1,9 +1,12 @@
+import os
 import numpy as np
+import copy
+
 import marxs
 import marxs.optics
 from marxs.simulator import Sequence
 from marxs.source import PointSource, FixedPointing
-from marxs.analysis import fwhm_per_order, weighted_per_order
+from marxs.analysis import resolvingpower_per_order, weighted_per_order
 
 from mayavi import mlab
 from marxs.math.pluecker import h2e
@@ -19,16 +22,71 @@ detfp.loc_coos_name = ['detfp_x', 'detfp_y']
 detfp.detpix_name = ['detfppix_x', 'detfppix_y']
 detfp.display['opacity'] = 0.2
 
+# Place an additional detector on the Rowland circle.
+detcirc = marxs.optics.CircularDetector.from_rowland(rowland, width=20)
+detcirc.loc_coos_name = ['detcirc_phi', 'detcirc_y']
+detcirc.detpix_name = ['detcircpix_x', 'detcircpix_y']
+detcirc.display['opacity'] = 0.2
+
+
+uptomirror = Sequence(elements=[aper, mirror])
+
 
 keeppos = marxs.simulator.KeepCol('pos')
-arcus = Sequence(elements=[aper, mirror, gas, catsupport, det, detfp],
-                 postprocess_steps=[keeppos])
+mission = Sequence(elements=[aper, mirror, gas, catsupport, det, detfp],
+                   postprocess_steps=[keeppos])
 
 star = PointSource(coords=(23., 45.), flux=5.)
 pointing = FixedPointing(coords=(23., 45.))
-photons = star.generate_photons(exposuretime=200)
-p = pointing(photons)
-p = arcus(p)
+photons = star.generate_photons(exposuretime=2000)
+photons = pointing(photons)
+
+### Look at different energies for some orders in detail
+p = uptomirror(photons.copy())
+
+gratings = copy.deepcopy(gas)
+p1 = p.copy()
+p025 = p.copy()
+p025['energy'] = 0.25
+
+gratingeff = marxs.optics.constant_order_factory(0)
+for elem in gratings.elements:
+            elem.order_selector = gratingeff
+
+p1o0 = gratings(p1.copy())
+p025o0 = gratings(p025.copy())
+
+gratingeff = marxs.optics.constant_order_factory(-2)
+for elem in gratings.elements:
+            elem.order_selector = gratingeff
+
+p1o2 = gratings(p1.copy())
+p025o2 = gratings(p025.copy())
+
+gratingeff = marxs.optics.constant_order_factory(-4)
+for elem in gratings.elements:
+            elem.order_selector = gratingeff
+
+p1o4 = gratings(p1.copy())
+p025o4 = gratings(p025.copy())
+
+for ptemp in [p1o0, p1o2, p1o4, p025o0, p025o2, p025o4]:
+    ptemp.remove_rows(np.isnan(ptemp['order']))
+    ptemp = detcirc(ptemp)
+
+
+fig = mlab.figure()
+mlab.clf()
+
+d = np.dstack(keeppos2.data)
+d = np.swapaxes(d, 1, 2)
+d = h2e(d)
+
+marxs.visualization.mayavi.plot_rays(d, viewer=fig)
+
+
+### Main flow continues here
+p = mission(photons.copy())
 
 
 fig = mlab.figure()
@@ -38,8 +96,8 @@ d = np.dstack(keeppos.data)
 d = np.swapaxes(d, 1, 2)
 d = h2e(d)
 
-marxs.visualization.mayavi.plot_rays(d, scalar=p['energy'], viewer=fig)
-arcus.plot(format="mayavi", viewer=fig)
+marxs.visualization.mayavi.plot_rays(d, scalar=p['order'], viewer=fig)
+mission.plot(format="mayavi", viewer=fig)
 
 theta, phi = np.mgrid[-0.2 + np.pi:0.2 + np.pi:60j, -1:1:60j]
 rowland.plot(theta=theta, phi=phi, viewer=fig, format='mayavi')
@@ -50,7 +108,7 @@ import marxs.utils
 from marxs.design import GratingArrayStructure
 from arcus import CATGrating, order_selector, blazemat
 
-ryan = fits.getdata(os.path.join(path, '..', '160418_SPOTrace.fits'))
+ryan = fits.getdata(os.path.join('..', '160418_SPOTrace.fits'))
 rp = marxs.utils.generate_test_photons(ryan.shape[1])
 for col, indoffset in zip(['pos', 'dir'], [0, 3]):
     rp[col][:, 0] = ryan[2 + indoffset, :]
@@ -60,7 +118,7 @@ for col, indoffset in zip(['pos', 'dir'], [0, 3]):
 
 gas2 = GratingArrayStructure(rowland=rowland, d_element=30.,
                              x_range=[1e4, 1.4e4],
-                             radius=[300, 800], phi=[-0.3+np.pi/2, .3+np.pi/2],
+                             radius=[300, 800], phi=[-0.3 + np.pi / 2, .3 + np.pi / 2],
                              elem_class=CATGrating,
                              elem_args={'d': 2e-4, 'zoom': [1., 10., 10.],
                                         'orientation': blazemat,
@@ -82,21 +140,21 @@ theta, phi = np.mgrid[-0.2 + np.pi:0.2 + np.pi:60j, -1:1:60j]
 rowland.plot(theta=theta, phi=phi, viewer=fig, format='mayavi')
 
 orders = np.arange(-10, 0)
-fwhm_per_order(gas2, rp.copy(), orders)
+#fwhm_per_order(gas2, rp.copy(), orders)
 
 
-    if len(orders) != data.shape[0]:
-        raise ValueError('First dimension of "data" must match length of "orders".')
-    if len(energy) != data.shape[1]:
-        raise ValueError('Second dimension of "data" must match length of "energy".')
+# if len(orders) != data.shape[0]:
+#     raise ValueError('First dimension of "data" must match length of "orders".')
+# if len(energy) != data.shape[1]:
+#     raise ValueError('Second dimension of "data" must match length of "energy".')
 
-    weights = np.zeros_like(data)
-    for i, o in enumerate(orders):
-        ind_o = (gratingeff.orders == o).nonzero()[0]
-        if len(ind_o) != 1:
-            raise KeyError('No data for order {0} in gratingeff'.format(o))
-        en_sort = np.argsort(gratingeff.energy)
-        weights[o, :] = np.interp(energy, gratingeff.energy[en_sort],
-                                  gratingeff.prob[:, ind_o[0]][en_sort])
+# weights = np.zeros_like(data)
+# for i, o in enumerate(orders):
+#     ind_o = (gratingeff.orders == o).nonzero()[0]
+#     if len(ind_o) != 1:
+#         raise KeyError('No data for order {0} in gratingeff'.format(o))
+#     en_sort = np.argsort(gratingeff.energy)
+#     weights[o, :] = np.interp(energy, gratingeff.energy[en_sort],
+#                               gratingeff.prob[:, ind_o[0]][en_sort])
 
-    return np.ma.average(data, axis=0, weights=weights)
+# return np.ma.average(data, axis=0, weights=weights)
