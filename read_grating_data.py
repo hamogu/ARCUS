@@ -28,7 +28,7 @@ class InterpolateRalfTable(object):
 
     Because the wave, theta grid is regular, this class can use the
     `scipy.interpolate.RectBivariateSpline` for interpolation in each 2-d slice
-    (``order`` is an intergeter and not interpolated).
+    (``order`` is an integer and not interpolated).
 
     Parameters
     ----------
@@ -43,7 +43,7 @@ class InterpolateRalfTable(object):
         sheet = ralf.get_sheet_by_name('Sheet1')
         wave = np.array([d[0].value for d in sheet['A3:A{0}'.format(sheet.max_row)]])
         theta = np.array([d[0].value for d in sheet['B3:B{0}'.format(sheet.max_row)]])
-        self.orders = np.array([d.value for d in list(sheet.get_squared_range(3, 2, sheet.max_column, 2))[0]])
+        self.orders = -np.array([d.value for d in list(sheet.get_squared_range(3, 2, sheet.max_column, 2))[0]])
         datagenerator = sheet.get_squared_range(3, 3, sheet.max_column, sheet.max_row)
         data = np.empty((sheet.max_column - 2, sheet.max_row - 2))
         for i, r in enumerate(datagenerator):
