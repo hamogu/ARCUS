@@ -62,7 +62,7 @@ R, r, pos4d = design_tilted_torus(12e3, np.deg2rad(blazeang),
                                   2 * np.deg2rad(blazeang))
 rowland = RowlandTorus(R, r, pos4d=pos4d)
 
-blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(blazeang))
+blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-blazeang))
 gas = GratingArrayStructure(rowland=rowland, d_element=30.,
                             x_range=[1e4, 1.4e4],
                             radius=[50, 300], phi=[-0.3+np.pi/2, .3+np.pi/2],
