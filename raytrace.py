@@ -46,31 +46,31 @@ p = uptomirror(photons.copy())
 
 gratings = copy.deepcopy(gas)
 p1 = p.copy()
-p025 = p.copy()
-p025['energy'] = 0.25
+p02 = p.copy()
+p02['energy'] = 0.2
 
 gratingeff = marxs.optics.constant_order_factory(0)
 for elem in gratings.elements:
             elem.order_selector = gratingeff
 
 p1o0 = gratings(p1.copy())
-p025o0 = gratings(p025.copy())
+p02o0 = gratings(p02.copy())
 
-gratingeff = marxs.optics.constant_order_factory(-2)
+gratingeff = marxs.optics.constant_order_factory(-5)
 for elem in gratings.elements:
             elem.order_selector = gratingeff
 
 p1o2 = gratings(p1.copy())
-p025o2 = gratings(p025.copy())
+p02o2 = gratings(p02.copy())
 
-gratingeff = marxs.optics.constant_order_factory(-4)
+gratingeff = marxs.optics.constant_order_factory(-10)
 for elem in gratings.elements:
             elem.order_selector = gratingeff
 
 p1o4 = gratings(p1.copy())
-p025o4 = gratings(p025.copy())
+p02o4 = gratings(p02.copy())
 
-for ptemp in [p1o0, p1o2, p1o4, p025o0, p025o2, p025o4]:
+for ptemp in [p1o0, p1o2, p1o4, p02o0, p02o2, p02o4]:
     ptemp.remove_rows(np.isnan(ptemp['order']))
     ptemp = detcirc(ptemp)
 
