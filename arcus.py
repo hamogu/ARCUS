@@ -9,7 +9,8 @@ import marxs
 from marxs.simulator import Sequence
 from marxs.optics import (GlobalEnergyFilter, EnergyFilter,
                           FlatDetector, CATGrating,
-                          CircleAperture, PerfectLens, RadialMirrorScatter)
+                          PerfectLens, RadialMirrorScatter)
+from marxs import optics
 from marxs.design.rowland import (RowlandTorus, design_tilted_torus,
                                   GratingArrayStructure, LinearCCDArray)
 
@@ -37,8 +38,9 @@ entrancepos = np.array([12000., 0., 0.])
 # Set a little above entrance pos (the mirror) for display purposes.
 # Thus, needs to be geometrically bigger for off-axis sources.
 
-aper = CircleAperture(position=[12200, 0, 0], zoom=300,
-                      phi=[-0.3 + np.pi / 2, .3 + np.pi / 2])
+# aper = optics.CircleAperture(position=[12200, 0, 0], zoom=300,
+#                       phi=[-0.3 + np.pi / 2, .3 + np.pi / 2])\
+aper = optics.RectangleAperture(position=[12200, 0, 550], zoom=[1,180, 250])
 lens = PerfectLens(focallength=12000., position=entrancepos)
 # Scatter as FWHM ~8 arcsec. Divide by 2.3545 to get Gaussian sigma.
 rms = RadialMirrorScatter(inplanescatter=8. / 2.3545 / 3600 / 180. * np.pi,
@@ -65,7 +67,7 @@ rowland = RowlandTorus(R, r, pos4d=pos4d)
 blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-blazeang))
 gas = GratingArrayStructure(rowland=rowland, d_element=30.,
                             x_range=[1e4, 1.4e4],
-                            radius=[50, 300], phi=[-0.3+np.pi/2, .3+np.pi/2],
+                            radius=[300, 800], phi=[-0.5+np.pi/2, .5+np.pi/2],
                             elem_class=CATGrating,
                             elem_args={'d': 2e-4, 'zoom': [1., 10., 10.], 'orientation': blazemat,
                                        'order_selector': order_selector},
@@ -79,6 +81,6 @@ flatstackargs = {'zoom': [1, 24.576, 12.288],
 # 500 mu gap between detectors
 det = LinearCCDArray(rowland=rowland, elem_class=marxs.optics.FlatStack,
                      elem_args=flatstackargs, d_element=49.652, phi=0,
-                     x_range=[0, 200], radius=[-1000, -400])
+                     x_range=[-200, 0], radius=[-400, 400])
 
 arcus = Sequence(elements=[aper, mirror, gas, catsupport, det])
