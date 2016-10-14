@@ -12,7 +12,9 @@ from marxs.optics import (GlobalEnergyFilter, EnergyFilter,
                           PerfectLens, RadialMirrorScatter)
 from marxs import optics
 from marxs.design.rowland import (RowlandTorus, design_tilted_torus,
-                                  GratingArrayStructure, LinearCCDArray)
+                                  GratingArrayStructure,
+                                  RectangularGrid,
+                                  LinearCCDArray)
 
 from read_grating_data import InterpolateRalfTable
 
@@ -65,11 +67,18 @@ R, r, pos4d = design_tilted_torus(12e3, np.deg2rad(blazeang),
 rowland = RowlandTorus(R, r, pos4d=pos4d)
 
 blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-blazeang))
-gas = GratingArrayStructure(rowland=rowland, d_element=30.,
+# gas_old = GratingArrayStructure(rowland=rowland, d_element=30.,
+#                             x_range=[1e4, 1.4e4],
+#                             radius=[300, 800], phi=[-0.5+np.pi/2, .5+np.pi/2],
+#                             elem_class=CATGrating,
+#                             elem_args={'d': 2e-4, 'zoom': [1., 10., 10.], 'orientation': blazemat,
+#                                        'order_selector': order_selector},
+#                         )
+gas = RectangularGrid(rowland=rowland, d_element=38.,
                             x_range=[1e4, 1.4e4],
-                            radius=[300, 800], phi=[-0.5+np.pi/2, .5+np.pi/2],
+                            z_range=[300, 800], y_range=[-180,180],
                             elem_class=CATGrating,
-                            elem_args={'d': 2e-4, 'zoom': [1., 10., 10.], 'orientation': blazemat,
+                            elem_args={'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazemat,
                                        'order_selector': order_selector},
                         )
 
