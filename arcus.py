@@ -6,7 +6,7 @@ from scipy.interpolate import interp1d
 import transforms3d
 
 import marxs
-from marxs.simulator import Sequence
+from marxs.simulator import Sequence, KeepCol
 from marxs.optics import (GlobalEnergyFilter, EnergyFilter,
                           FlatDetector, CATGrating,
                           PerfectLens, RadialMirrorScatter)
@@ -14,7 +14,7 @@ from marxs import optics
 from marxs.design.rowland import (RowlandTorus, design_tilted_torus,
                                   GratingArrayStructure,
                                   RectangularGrid,
-                                  LinearCCDArray)
+                                  LinearCCDArray, RowlandCircleArray)
 
 from read_grating_data import InterpolateRalfTable
 
@@ -88,8 +88,28 @@ flatstackargs = {'zoom': [1, 24.576, 12.288],
                  'keywords': [{'filterfunc': interp1d(energy, sifiltercurve * uvblocking * opticalblocking * ccdcontam * qebiccd)}, {'pixsize': 0.024}]
                  }
 # 500 mu gap between detectors
-det = LinearCCDArray(rowland=rowland, elem_class=marxs.optics.FlatStack,
-                     elem_args=flatstackargs, d_element=49.652, phi=0,
-                     x_range=[-200, 0], radius=[-400, 400])
+# det = LinearCCDArray(rowland=rowland, elem_class=marxs.optics.FlatStack,
+#                      elem_args=flatstackargs, d_element=49.652, phi=0,
+#                      x_range=[-200, 0], radius=[-400, 400])
+
+det = RowlandCircleArray(rowland=rowland, elem_class=marxs.optics.FlatStack,
+                     elem_args=flatstackargs, d_element=49.652,
+                         theta=[np.pi - 0.2, np.pi + 0.1])
+
 
 arcus = Sequence(elements=[aper, mirror, gas, catsupport, det])
+
+
+# Place an additional detector in the focal plane for comparison
+# Detectors are transparent to allow this stuff
+detfp = marxs.optics.FlatDetector(zoom=[.2, 10000, 10000])
+detfp.loc_coos_name = ['detfp_x', 'detfp_y']
+detfp.detpix_name = ['detfppix_x', 'detfppix_y']
+detfp.display['opacity'] = 0.1
+
+keeppos = KeepCol('pos')
+
+arcusfp = Sequence(elements=[aper, mirror, gas, catsupport, det, detfp],
+                   postprocess_steps=[keeppos])
+
+arcus_joern = Sequence(elements=[aper, mirror, gas, catsupport, detfp])

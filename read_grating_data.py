@@ -22,7 +22,8 @@ class InterpolateRalfTable(object):
     - Column B: blaze angle in deg.
     - Rest: data
 
-    For each wavelength there are multiple blaze angles listed, so Column A contains
+    For each wavelength there are multiple blaze angles listed, so Column A
+    contains
     many dublicates and looks like this: [1,1,1,1,1,1,2,2,2,2,2,2,3,3,3, ...].
     Column B repeats like this: [1,2,3,4,5,6,1,2,3,4,5,6,1,2,3, ...].
 

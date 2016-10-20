@@ -6,14 +6,15 @@ from astropy.table import Table
 import astropy.units as u
 import arcus
 
-n_photons = 1e4
-wave = np.arange(8., 60., 0.5) * u.Angstrom
+n_photons = 1e6
+wave = np.arange(8., 50., 0.5) * u.Angstrom
 #energies = np.arange(.2, 1.9, .01)
 energies = wave.to(u.keV, equivalencies=u.spectral()).value
-outfile = '../results/aeff.fits'
+outfile = '../results/aeff1e6.fits'
 
 out_e = []
 out_aeff = []
+out_ccdid = []
 
 try:
     for i, e in enumerate(energies):
@@ -34,10 +35,14 @@ try:
                                weights=photons['probability'][detected],
                                minlength=15)
         out_aeff.append(bincount / n_photons)
+        bincount = np.bincount(np.asarray((photons['CCD_ID'][detected]), dtype=int),
+                               weights=photons['probability'][detected],
+                               minlength=len(arcus.det.elements) + 1)
+        out_ccdid.append(bincount / n_photons)
 
 finally:
     # Any exception in the calculation - save what we have so far!
-    tab = Table([out_e, out_aeff],
-                names=('energy', 'fA'))
+    tab = Table([out_e, out_aeff, out_ccdid],
+                names=('energy', 'fA', 'CCD_ID'))
     tab.meta['nphotons'] = n_photons
     tab.write(outfile, overwrite=True)
