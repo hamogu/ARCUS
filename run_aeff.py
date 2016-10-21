@@ -6,11 +6,11 @@ from astropy.table import Table
 import astropy.units as u
 import arcus
 
-n_photons = 1e6
+n_photons = 1e4
 wave = np.arange(8., 50., 0.5) * u.Angstrom
 #energies = np.arange(.2, 1.9, .01)
 energies = wave.to(u.keV, equivalencies=u.spectral()).value
-outfile = '../results/aeff1e6.fits'
+outfile = '../results/aeff.fits'
 
 out_e = []
 out_aeff = []

@@ -74,7 +74,7 @@ blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-bl
 #                             elem_args={'d': 2e-4, 'zoom': [1., 10., 10.], 'orientation': blazemat,
 #                                        'order_selector': order_selector},
 #                         )
-gas = RectangularGrid(rowland=rowland, d_element=38.,
+gas = RectangularGrid(rowland=rowland, d_element=34.,
                             x_range=[1e4, 1.4e4],
                             z_range=[300, 800], y_range=[-180,180],
                             elem_class=CATGrating,
@@ -99,6 +99,8 @@ det = RowlandCircleArray(rowland=rowland, elem_class=marxs.optics.FlatStack,
 
 arcus = Sequence(elements=[aper, mirror, gas, catsupport, det])
 
+keepp = KeepCol('probability')
+arcusdetail = Sequence(elements=[aper, lens, rms, mirrorefficiency, gas, catsupport, det], postprocess_steps=[keepp])
 
 # Place an additional detector in the focal plane for comparison
 # Detectors are transparent to allow this stuff
