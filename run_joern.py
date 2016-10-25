@@ -13,7 +13,7 @@ n_photons = 1e4
 wave = np.arange(8., 50., 0.5) * u.Angstrom
 energies = wave.to(u.keV, equivalencies=u.spectral()).value
 
-outdir = '../joern/'
+outdir = '/melkor/d1/guenther/Dropbox/ARCUS/raysforJoern/'
 
 pointing_offsets = [0, np.deg2rad(0.1)]
 

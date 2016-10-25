@@ -27,6 +27,7 @@ ax.set_xlim([10, 60])
 ax.annotate('order -4 hits chip gap', xy=(37, 95), xytext=(15, 500),
             arrowprops=dict(facecolor='black', shrink=0.05),
             fontsize=20)
+fig.savefig('../results/A_effmanychips.png')
 
 fig2 = plt.figure()
 ax = fig2.add_subplot(111)
@@ -38,3 +39,4 @@ ax.legend(title='# CCDs')
 ax.set_xlabel('wavelength [$\AA{}$]')
 ax.set_ylabel('$A_{eff}$ [cm$^2]$')
 ax.set_xlim([10, 50])
+fig2.savefig('../results/A_eff.png')
