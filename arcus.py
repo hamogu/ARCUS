@@ -42,7 +42,11 @@ entrancepos = np.array([12000., 0., 0.])
 
 # aper = optics.CircleAperture(position=[12200, 0, 0], zoom=300,
 #                       phi=[-0.3 + np.pi / 2, .3 + np.pi / 2])\
-aper = optics.RectangleAperture(position=[12200, 0, 550], zoom=[1,180, 250])
+
+aper_rect1 = optics.RectangleAperture(position=[12200, 0, 550], zoom=[1,180, 250])
+aper_rect2 = optics.RectangleAperture(position=[12200, 0, -550], zoom=[1,180, 250])
+
+aper = optics.MultiAperture(elements=[aper_rect1, aper_rect2])
 lens = PerfectLens(focallength=12000., position=entrancepos)
 # Scatter as FWHM ~8 arcsec. Divide by 2.3545 to get Gaussian sigma.
 rms = RadialMirrorScatter(inplanescatter=8. / 2.3545 / 3600 / 180. * np.pi,
@@ -74,14 +78,21 @@ blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-bl
 #                             elem_args={'d': 2e-4, 'zoom': [1., 10., 10.], 'orientation': blazemat,
 #                                        'order_selector': order_selector},
 #                         )
-gas = RectangularGrid(rowland=rowland, d_element=32.,
+gas_1 = RectangularGrid(rowland=rowland, d_element=32.,
                             x_range=[1e4, 1.4e4],
                             z_range=[300, 800], y_range=[-180,180],
                             elem_class=CATGrating,
                             elem_args={'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazemat,
                                        'order_selector': order_selector},
                         )
-
+gas_2 = RectangularGrid(rowland=rowland, d_element=32.,
+                            x_range=[1e4, 1.4e4],
+                            z_range=[-800, -300], y_range=[-180,180],
+                            elem_class=CATGrating,
+                            elem_args={'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazemat,
+                                       'order_selector': order_selector},
+                        )
+gas = Sequence(elements=[gas_1, gas_2])
 
 flatstackargs = {'zoom': [1, 24.576, 12.288],
                  'elements': [EnergyFilter, FlatDetector],
