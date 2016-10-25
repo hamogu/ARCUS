@@ -33,6 +33,21 @@ ccdcontam = np.array(mastersheet.col_values(23, start_rowx=6))
 qebiccd = np.array(mastersheet.col_values(24, start_rowx=6))
 
 
+blazeang = 1.91
+
+alpha = np.deg2rad(2* blazeang)
+beta = np.deg2rad(4 * blazeang)
+R, r, pos4d = design_tilted_torus(12e3, alpha, beta)
+rowland = RowlandTorus(R, r, pos4d=pos4d)
+
+Rm, rm, pos4dm = design_tilted_torus(12e3, - alpha, -beta)
+rowlandm = RowlandTorus(Rm, rm, pos4d=pos4dm)
+d = r * np.sin(alpha)
+shift_optical_axis = np.eye(4)
+shift_optical_axis[1, 3] = 2. * d
+rowlandm.pos4d = np.dot(shift_optical_axis, rowlandm.pos4d)
+
+
 mirrorefficiency = GlobalEnergyFilter(filterfunc=interp1d(energy, spogeometricthroughput * doublereflectivity))
 
 entrancepos = np.array([12000., 0., 0.])
@@ -46,14 +61,27 @@ entrancepos = np.array([12000., 0., 0.])
 aper_rect1 = optics.RectangleAperture(position=[12200, 0, 550], zoom=[1,180, 250])
 aper_rect2 = optics.RectangleAperture(position=[12200, 0, -550], zoom=[1,180, 250])
 
+aper_rect1m = optics.RectangleAperture(pos4d=np.dot(shift_optical_axis, aper_rect1.pos4d))
+aper_rect2m = optics.RectangleAperture(pos4d=np.dot(shift_optical_axis, aper_rect2.pos4d))
+
 aper = optics.MultiAperture(elements=[aper_rect1, aper_rect2])
+aperm = optics.MultiAperture(elements=[aper_rect1m, aper_rect2m])
+
 lens = PerfectLens(focallength=12000., position=entrancepos)
+lensm = PerfectLens(focallength=12000., pos4d=np.dot(shift_optical_axis, lens.pos4d))
 # Scatter as FWHM ~8 arcsec. Divide by 2.3545 to get Gaussian sigma.
 rms = RadialMirrorScatter(inplanescatter=8. / 2.3545 / 3600 / 180. * np.pi,
                           perpplanescatter=1. / 2.345 / 3600. / 180. * np.pi,
                           position=entrancepos)
 
+rmsm = RadialMirrorScatter(inplanescatter=8. / 2.3545 / 3600 / 180. * np.pi,
+                           perpplanescatter=1. / 2.345 / 3600. / 180. * np.pi,
+                           pos4d=np.dot(shift_optical_axis, rms.pos4d))
+
+
 mirror = Sequence(elements=[lens, rms, mirrorefficiency])
+mirrorm = Sequence(elements=[lensm, rmsm, mirrorefficiency])
+
 
 # CAT grating
 ralfdata = os.path.join(path, '../Si_4um_deep_30pct_dc.xlsx')
@@ -64,11 +92,6 @@ order_selector = InterpolateRalfTable(ralfdata)
 # L2 support: blocks 19 %
 catsupport = GlobalEnergyFilter(filterfunc=lambda e: 0.81 * 0.82)
 
-blazeang = 1.91
-
-R, r, pos4d = design_tilted_torus(12e3, np.deg2rad(blazeang),
-                                  2 * np.deg2rad(blazeang))
-rowland = RowlandTorus(R, r, pos4d=pos4d)
 
 blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-blazeang))
 # gas_old = GratingArrayStructure(rowland=rowland, d_element=30.,
@@ -94,6 +117,27 @@ gas_2 = RectangularGrid(rowland=rowland, d_element=32.,
                         )
 gas = Sequence(elements=[gas_1, gas_2])
 
+blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(blazeang))
+gas_1m = RectangularGrid(rowland=rowlandm, d_element=32.,
+                            x_range=[1e4, 1.4e4],
+                            z_range=[300, 800], y_range=[-180 + 2 * d, 180 + 2 * d],
+                            elem_class=CATGrating,
+                            elem_args={'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazematm,
+                                       'order_selector': order_selector},
+                         normal_spec=np.array([0, 2*d, 0, 1.]),
+                        )
+gas_2m = RectangularGrid(rowland=rowlandm, d_element=32.,
+                            x_range=[1e4, 1.4e4],
+                            z_range=[-800, -300], y_range=[-180 + 2* d, 180 + 2 * d],
+                            elem_class=CATGrating,
+                            elem_args={'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazematm,
+                                       'order_selector': order_selector},
+
+                         normal_spec=np.array([0, 2*d, 0, 1.]),
+                        )
+gasm = Sequence(elements=[gas_1m, gas_2m])
+
+
 flatstackargs = {'zoom': [1, 24.576, 12.288],
                  'elements': [EnergyFilter, FlatDetector],
                  'keywords': [{'filterfunc': interp1d(energy, sifiltercurve * uvblocking * opticalblocking * ccdcontam * qebiccd)}, {'pixsize': 0.024}]
@@ -105,10 +149,15 @@ flatstackargs = {'zoom': [1, 24.576, 12.288],
 
 det = RowlandCircleArray(rowland=rowland, elem_class=marxs.optics.FlatStack,
                      elem_args=flatstackargs, d_element=49.652,
-                         theta=[np.pi - 0.2, np.pi + 0.1])
+                         theta=[np.pi - 0.4, np.pi + 0.4])
+
+detm = RowlandCircleArray(rowland=rowlandm, elem_class=marxs.optics.FlatStack,
+                          elem_args=flatstackargs, d_element=49.652,
+                          theta=[0, np.pi + 0.2])
 
 
 arcus = Sequence(elements=[aper, mirror, gas, catsupport, det])
+arcusm = Sequence(elements=[aperm, mirrorm, gasm, catsupport, det])
 
 # Place an additional detector in the focal plane for comparison
 # Detectors are transparent to allow this stuff
@@ -118,8 +167,12 @@ detfp.detpix_name = ['detfppix_x', 'detfppix_y']
 detfp.display['opacity'] = 0.1
 
 keeppos = KeepCol('pos')
+keepposm = KeepCol('pos')
 
 arcusfp = Sequence(elements=[aper, mirror, gas, catsupport, det, detfp],
                    postprocess_steps=[keeppos])
+
+arcusfpm = Sequence(elements=[aperm, mirrorm, gasm, catsupport, det, detfp],
+                    postprocess_steps=[keepposm])
 
 arcus_joern = Sequence(elements=[aper, mirror, gas, catsupport, detfp])

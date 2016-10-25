@@ -16,33 +16,40 @@ out_e = []
 out_aeff = []
 out_ccdid = []
 
+out_aeffm = []
+out_ccdidm = []
+
 try:
     for i, e in enumerate(energies):
-        mysource = PointSource((30., 30.), energy=e, flux=1.)
-        photons = mysource.generate_photons(n_photons)
-
-        mypointing = FixedPointing(coords=(30, 30.))
-        photons = mypointing(photons)
-        photons = arcus.arcus(photons)
         print '{0}/{1}'.format(i + 1, len(energies))
+        mysource = PointSource((30., 30.), energy=e, flux=1.)
+        mypointing = FixedPointing(coords=(30, 30.))
         out_e.append(e)
-        # keep only those photons that went through a grating facet
-        # The other will be absorbed by support structure.
-        photons = photons[photons['facet'] >= 0]
-        # select detected photons
-        detected = photons['CCD_ID'] >= 0.
-        bincount = np.bincount(np.asarray((photons['order'][detected] + 20), dtype=int),
-                               weights=photons['probability'][detected],
-                               minlength=15)
-        out_aeff.append(bincount / n_photons)
-        bincount = np.bincount(np.asarray((photons['CCD_ID'][detected]), dtype=int),
-                               weights=photons['probability'][detected],
-                               minlength=len(arcus.det.elements) + 1)
-        out_ccdid.append(bincount / n_photons)
+
+        for mission, out in zip([arcus.arcus, arcus.arcusm], [[out_aeff, out_ccdid],
+                                                              [out_aeffm, out_ccdidm]]):
+
+            photons = mysource.generate_photons(n_photons)
+            photons = mypointing(photons)
+            photons = mission(photons)
+
+            # keep only those photons that went through a grating facet
+            # The other will be absorbed by support structure.
+            photons = photons[photons['facet'] >= 0]
+            # select detected photons
+            detected = photons['CCD_ID'] >= 0.
+            bincount = np.bincount(np.asarray((photons['order'][detected] + 20), dtype=int),
+                                   weights=photons['probability'][detected],
+                                   minlength=15)
+            out[0].append(bincount / n_photons)
+            bincount = np.bincount(np.asarray((photons['CCD_ID'][detected]), dtype=int),
+                                   weights=photons['probability'][detected],
+                                   minlength=len(arcus.det.elements) + 1)
+            out[1].append(bincount / n_photons)
 
 finally:
     # Any exception in the calculation - save what we have so far!
-    tab = Table([out_e, out_aeff, out_ccdid],
-                names=('energy', 'fA', 'CCD_ID'))
+    tab = Table([out_e, out_aeff, out_ccdid, out_aeffm, out_ccdidm],
+                names=('energy', 'Aeff', 'CCD_ID', 'Aeffm', 'CCD_IDm'))
     tab.meta['nphotons'] = n_photons
     tab.write(outfile, overwrite=True)
