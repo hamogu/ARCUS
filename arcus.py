@@ -15,6 +15,7 @@ from marxs.design.rowland import (RowlandTorus, design_tilted_torus,
                                   GratingArrayStructure,
                                   RectangularGrid,
                                   LinearCCDArray, RowlandCircleArray)
+import marxs.analysis
 
 from read_grating_data import InterpolateRalfTable
 
@@ -35,7 +36,7 @@ qebiccd = np.array(mastersheet.col_values(24, start_rowx=6))
 
 blazeang = 1.91
 
-alpha = np.deg2rad(2* blazeang)
+alpha = np.deg2rad(2 * blazeang)
 beta = np.deg2rad(4 * blazeang)
 R, r, pos4d = design_tilted_torus(12e3, alpha, beta)
 rowland = RowlandTorus(R, r, pos4d=pos4d)
@@ -58,8 +59,8 @@ entrancepos = np.array([12000., 0., 0.])
 # aper = optics.CircleAperture(position=[12200, 0, 0], zoom=300,
 #                       phi=[-0.3 + np.pi / 2, .3 + np.pi / 2])\
 
-aper_rect1 = optics.RectangleAperture(position=[12200, 0, 550], zoom=[1,180, 250])
-aper_rect2 = optics.RectangleAperture(position=[12200, 0, -550], zoom=[1,180, 250])
+aper_rect1 = optics.RectangleAperture(position=[12200, 0, 550], zoom=[1, 180, 250])
+aper_rect2 = optics.RectangleAperture(position=[12200, 0, -550], zoom=[1, 180, 250])
 
 aper_rect1m = optics.RectangleAperture(pos4d=np.dot(shift_optical_axis, aper_rect1.pos4d))
 aper_rect2m = optics.RectangleAperture(pos4d=np.dot(shift_optical_axis, aper_rect2.pos4d))
@@ -93,49 +94,37 @@ order_selector = InterpolateRalfTable(ralfdata)
 catsupport = GlobalEnergyFilter(filterfunc=lambda e: 0.81 * 0.82)
 
 
-blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-blazeang))
-# gas_old = GratingArrayStructure(rowland=rowland, d_element=30.,
-#                             x_range=[1e4, 1.4e4],
-#                             radius=[300, 800], phi=[-0.5+np.pi/2, .5+np.pi/2],
-#                             elem_class=CATGrating,
-#                             elem_args={'d': 2e-4, 'zoom': [1., 10., 10.], 'orientation': blazemat,
-#                                        'order_selector': order_selector},
-#                         )
-gas_1 = RectangularGrid(rowland=rowland, d_element=32.,
-                            x_range=[1e4, 1.4e4],
-                            z_range=[300, 800], y_range=[-180,180],
-                            elem_class=CATGrating,
-                            elem_args={'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazemat,
-                                       'order_selector': order_selector},
-                        )
-gas_2 = RectangularGrid(rowland=rowland, d_element=32.,
-                            x_range=[1e4, 1.4e4],
-                            z_range=[-800, -300], y_range=[-180,180],
-                            elem_class=CATGrating,
-                            elem_args={'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazemat,
-                                       'order_selector': order_selector},
-                        )
-gas = Sequence(elements=[gas_1, gas_2])
+class CATSupportbars(marxs.optics.base.OpticalElement):
+    '''Metal structure that holds grating facets will absorb all photons
+    that do not pass through a grating facet.
 
-blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(blazeang))
-gas_1m = RectangularGrid(rowland=rowlandm, d_element=32.,
-                            x_range=[1e4, 1.4e4],
-                            z_range=[300, 800], y_range=[-180 + 2 * d, 180 + 2 * d],
-                            elem_class=CATGrating,
-                            elem_args={'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazematm,
-                                       'order_selector': order_selector},
-                         normal_spec=np.array([0, 2*d, 0, 1.]),
-                        )
-gas_2m = RectangularGrid(rowland=rowlandm, d_element=32.,
-                            x_range=[1e4, 1.4e4],
-                            z_range=[-800, -300], y_range=[-180 + 2* d, 180 + 2 * d],
-                            elem_class=CATGrating,
-                            elem_args={'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazematm,
-                                       'order_selector': order_selector},
+    We might want to call this L3 support ;-)
+    '''
+    def process_photons(self, photons):
+        photons['probability'][photons['facet'] < 0] = 0.
+        return photons
 
-                         normal_spec=np.array([0, 2*d, 0, 1.]),
-                        )
-gasm = Sequence(elements=[gas_1m, gas_2m])
+catsupportbars = CATSupportbars()
+
+blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(blazeang))
+
+gratinggrid = {'rowland': rowland, 'd_element': 32., 'x_range': [1e4, 1.4e4],
+               'elem_class': CATGrating,
+               'elem_args': {'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazemat,
+                             'order_selector': order_selector}
+              }
+gas_1 = RectangularGrid(z_range=[300, 800], y_range=[-180, 180], **gratinggrid)
+gas_2 = RectangularGrid(z_range=[-800, -300], y_range=[-180, 180],
+                        id_num_offset=1000, **gratinggrid)
+gas = Sequence(elements=[gas_1, gas_2, catsupport, catsupportbars])
+
+gas_1m = RectangularGrid(z_range=[300, 800], y_range=[-180 + 2 * d, 180 + 2 * d],
+                         normal_spec=np.array([0, 2 * d, 0, 1.]),
+                         id_num_offset=2000, **gratinggrid)
+gas_2m = RectangularGrid(z_range=[-800, -300], y_range=[-180 + 2* d, 180 + 2 * d],
+                         normal_spec=np.array([0, 2 * d, 0, 1.]),
+                         id_num_offset=3000, **gratinggrid)
+gasm = Sequence(elements=[gas_1m, gas_2m, catsupport, catsupportbars])
 
 
 flatstackargs = {'zoom': [1, 24.576, 12.288],
@@ -143,21 +132,15 @@ flatstackargs = {'zoom': [1, 24.576, 12.288],
                  'keywords': [{'filterfunc': interp1d(energy, sifiltercurve * uvblocking * opticalblocking * ccdcontam * qebiccd)}, {'pixsize': 0.024}]
                  }
 # 500 mu gap between detectors
-# det = LinearCCDArray(rowland=rowland, elem_class=marxs.optics.FlatStack,
-#                      elem_args=flatstackargs, d_element=49.652, phi=0,
-#                      x_range=[-200, 0], radius=[-400, 400])
 
 det = RowlandCircleArray(rowland=rowland, elem_class=marxs.optics.FlatStack,
-                     elem_args=flatstackargs, d_element=49.652,
-                         theta=[np.pi - 0.4, np.pi + 0.4])
+                         elem_args=flatstackargs, d_element=49.652,
+                         theta=[np.pi - 0.2, np.pi + 0.5])
 
-detm = RowlandCircleArray(rowland=rowlandm, elem_class=marxs.optics.FlatStack,
-                          elem_args=flatstackargs, d_element=49.652,
-                          theta=[0, np.pi + 0.2])
-
-
-arcus = Sequence(elements=[aper, mirror, gas, catsupport, det])
-arcusm = Sequence(elements=[aperm, mirrorm, gasm, catsupport, det])
+# This is just one way to establish a global coordinate system for
+# detection on detectors that follow a curved surface.
+# Project (not propagate) down to the focal plane.
+projectfp = marxs.analysis.ProjectOntoPlane()
 
 # Place an additional detector in the focal plane for comparison
 # Detectors are transparent to allow this stuff
@@ -166,13 +149,19 @@ detfp.loc_coos_name = ['detfp_x', 'detfp_y']
 detfp.detpix_name = ['detfppix_x', 'detfppix_y']
 detfp.display['opacity'] = 0.1
 
+### Put together ARCUS in different configurations ###
+arcus = Sequence(elements=[aper, mirror, gas, det, projectfp])
+arcusm = Sequence(elements=[aperm, mirrorm, gasm, det, projectfp])
+
+
 keeppos = KeepCol('pos')
 keepposm = KeepCol('pos')
 
-arcusfp = Sequence(elements=[aper, mirror, gas, catsupport, det, detfp],
+arcusfp = Sequence(elements=[aper, mirror, gas, det, projectfp, detfp],
                    postprocess_steps=[keeppos])
 
-arcusfpm = Sequence(elements=[aperm, mirrorm, gasm, catsupport, det, detfp],
+arcusfpm = Sequence(elements=[aperm, mirrorm, gasm, det, projectfp, detfp],
                     postprocess_steps=[keepposm])
 
-arcus_joern = Sequence(elements=[aper, mirror, gas, catsupport, detfp])
+# No detector effects - Joern's simulator handles that itself.
+arcus_joern = Sequence(elements=[aper, mirror, gas, detfp])
