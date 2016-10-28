@@ -106,7 +106,8 @@ class CATSupportbars(marxs.optics.base.OpticalElement):
 
 catsupportbars = CATSupportbars()
 
-blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(blazeang))
+blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-blazeang))
+blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(blazeang))
 
 gratinggrid = {'rowland': rowland, 'd_element': 32., 'x_range': [1e4, 1.4e4],
                'elem_class': CATGrating,
@@ -118,6 +119,8 @@ gas_2 = RectangularGrid(z_range=[-800, -300], y_range=[-180, 180],
                         id_num_offset=1000, **gratinggrid)
 gas = Sequence(elements=[gas_1, gas_2, catsupport, catsupportbars])
 
+gratinggrid['rowland'] = rowlandm
+gratinggrid['elem_args']['orientation'] = blazematm
 gas_1m = RectangularGrid(z_range=[300, 800], y_range=[-180 + 2 * d, 180 + 2 * d],
                          normal_spec=np.array([0, 2 * d, 0, 1.]),
                          id_num_offset=2000, **gratinggrid)
@@ -142,6 +145,12 @@ det = RowlandCircleArray(rowland=rowland, elem_class=marxs.optics.FlatStack,
 # Project (not propagate) down to the focal plane.
 projectfp = marxs.analysis.ProjectOntoPlane()
 
+# Place an additional detector on the Rowland circle.
+detcirc = marxs.optics.CircularDetector.from_rowland(rowland, width=20)
+detcirc.loc_coos_name = ['detcirc_phi', 'detcirc_y']
+detcirc.detpix_name = ['detcircpix_x', 'detcircpix_y']
+detcirc.display['opacity'] = 0.1
+
 # Place an additional detector in the focal plane for comparison
 # Detectors are transparent to allow this stuff
 detfp = marxs.optics.FlatDetector(zoom=[.2, 10000, 10000])
@@ -157,10 +166,10 @@ arcusm = Sequence(elements=[aperm, mirrorm, gasm, det, projectfp])
 keeppos = KeepCol('pos')
 keepposm = KeepCol('pos')
 
-arcusfp = Sequence(elements=[aper, mirror, gas, det, projectfp, detfp],
+arcus_extra_det = Sequence(elements=[aper, mirror, gas, detcirc, det, projectfp, detfp],
                    postprocess_steps=[keeppos])
 
-arcusfpm = Sequence(elements=[aperm, mirrorm, gasm, det, projectfp, detfp],
+arcus_extra_det_m = Sequence(elements=[aperm, mirrorm, gasm, detcirc, det, projectfp, detfp],
                     postprocess_steps=[keepposm])
 
 # No detector effects - Joern's simulator handles that itself.
