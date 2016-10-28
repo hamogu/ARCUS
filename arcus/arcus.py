@@ -22,7 +22,7 @@ from read_grating_data import InterpolateRalfTable
 path = os.path.dirname(__file__)
 
 # Reading in data for grating reflectivity, filtercurves etc.
-arcusefficiencytable = xlrd.open_workbook(os.path.join(path, '../ArcusEffectiveArea-v3.xls'))
+arcusefficiencytable = xlrd.open_workbook(os.path.join(path, '../inputdata/ArcusEffectiveArea-v3.xls'))
 mastersheet = arcusefficiencytable.sheet_by_name('Master')
 energy = np.array(mastersheet.col_values(0, start_rowx=6)) / 1000.  # ev to keV
 spogeometricthroughput = np.array(mastersheet.col_values(3, start_rowx=6))
@@ -85,7 +85,7 @@ mirrorm = Sequence(elements=[lensm, rmsm, mirrorefficiency])
 
 
 # CAT grating
-ralfdata = os.path.join(path, '../Si_4um_deep_30pct_dc.xlsx')
+ralfdata = os.path.join(path, '../inputdata/Si_4um_deep_30pct_dc.xlsx')
 order_selector = InterpolateRalfTable(ralfdata)
 
 # Define L1, L2 blockage as simple filters due to geometric area
