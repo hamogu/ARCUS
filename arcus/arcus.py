@@ -71,12 +71,12 @@ aperm = optics.MultiAperture(elements=[aper_rect1m, aper_rect2m])
 lens = PerfectLens(focallength=12000., position=entrancepos)
 lensm = PerfectLens(focallength=12000., pos4d=np.dot(shift_optical_axis, lens.pos4d))
 # Scatter as FWHM ~8 arcsec. Divide by 2.3545 to get Gaussian sigma.
-rms = RadialMirrorScatter(inplanescatter=8. / 2.3545 / 3600 / 180. * np.pi,
-                          perpplanescatter=1. / 2.345 / 3600. / 180. * np.pi,
+rms = RadialMirrorScatter(inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
+                          perpplanescatter=1.5 / 2.345 / 3600. / 180. * np.pi,
                           position=entrancepos)
 
-rmsm = RadialMirrorScatter(inplanescatter=8. / 2.3545 / 3600 / 180. * np.pi,
-                           perpplanescatter=1. / 2.345 / 3600. / 180. * np.pi,
+rmsm = RadialMirrorScatter(inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
+                           perpplanescatter=1.5 / 2.345 / 3600. / 180. * np.pi,
                            pos4d=np.dot(shift_optical_axis, rms.pos4d))
 
 
