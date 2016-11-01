@@ -109,7 +109,7 @@ catsupportbars = CATSupportbars()
 blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-blazeang))
 blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(blazeang))
 
-gratquality = RalfQualityFactor(d=2e-4, sigma=1.75)
+gratquality = RalfQualityFactor(d=200.e-3, sigma=1.75e-3)
 
 gratinggrid = {'rowland': rowland, 'd_element': 32., 'x_range': [1e4, 1.4e4],
                'elem_class': CATGrating,

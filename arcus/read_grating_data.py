@@ -2,7 +2,8 @@ import numpy as np
 import astropy.units as u
 from scipy.interpolate import RectBivariateSpline
 from openpyxl import load_workbook
-from marxs.base import OpticalElement
+from marxs.optics.base import OpticalElement
+
 
 class DataFileFormatException(Exception):
     pass
@@ -117,11 +118,12 @@ class RalfQualityFactor(OpticalElement):
     scales the claculated diffraction probabilities to other parter instruments.
     '''
 
-    def __init__(**kwargs):
+    def __init__(self, **kwargs):
         self.sigma = kwargs.pop('sigma')
-        self.d = pwargs.pop('d')
-        suber(RalfQualityFactor, self).__init__(**kwargs)
+        self.d = kwargs.pop('d')
+        super(RalfQualityFactor, self).__init__(**kwargs)
 
     def process_photons(self, photons):
         ind = np.isfinite(photons['order'])
-        ind['probability'] *= np.exp(- (2 * np.pi * self.sigma/self.d)**2)**(photons['order']**2)
+        photons['probability'][ind] *= np.exp(- (2 * np.pi * self.sigma / self.d)**2)**(photons['order'][ind]**2)
+        return photons
