@@ -17,7 +17,7 @@ from marxs.design.rowland import (RowlandTorus, design_tilted_torus,
                                   LinearCCDArray, RowlandCircleArray)
 import marxs.analysis
 
-from read_grating_data import InterpolateRalfTable
+from read_grating_data import InterpolateRalfTable, RalfQualityFactor
 
 path = os.path.dirname(__file__)
 
@@ -109,6 +109,8 @@ catsupportbars = CATSupportbars()
 blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-blazeang))
 blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(blazeang))
 
+gratquality = RalfQualityFactor(d=2e-4, sigma=1.75)
+
 gratinggrid = {'rowland': rowland, 'd_element': 32., 'x_range': [1e4, 1.4e4],
                'elem_class': CATGrating,
                'elem_args': {'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazemat,
@@ -117,7 +119,7 @@ gratinggrid = {'rowland': rowland, 'd_element': 32., 'x_range': [1e4, 1.4e4],
 gas_1 = RectangularGrid(z_range=[300, 800], y_range=[-180, 180], **gratinggrid)
 gas_2 = RectangularGrid(z_range=[-800, -300], y_range=[-180, 180],
                         id_num_offset=1000, **gratinggrid)
-gas = Sequence(elements=[gas_1, gas_2, catsupport, catsupportbars])
+gas = Sequence(elements=[gas_1, gas_2, catsupport, catsupportbars, gratquality])
 
 gratinggrid['rowland'] = rowlandm
 gratinggrid['elem_args']['orientation'] = blazematm
@@ -127,7 +129,7 @@ gas_1m = RectangularGrid(z_range=[300, 800], y_range=[-180 + 2 * d, 180 + 2 * d]
 gas_2m = RectangularGrid(z_range=[-800, -300], y_range=[-180 + 2* d, 180 + 2 * d],
                          normal_spec=np.array([0, 2 * d, 0, 1.]),
                          id_num_offset=3000, **gratinggrid)
-gasm = Sequence(elements=[gas_1m, gas_2m, catsupport, catsupportbars])
+gasm = Sequence(elements=[gas_1m, gas_2m, catsupport, catsupportbars, gratquality])
 
 
 flatstackargs = {'zoom': [1, 24.576, 12.288],

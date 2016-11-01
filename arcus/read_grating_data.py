@@ -2,7 +2,7 @@ import numpy as np
 import astropy.units as u
 from scipy.interpolate import RectBivariateSpline
 from openpyxl import load_workbook
-
+from marxs.base import OpticalElement
 
 class DataFileFormatException(Exception):
     pass
@@ -108,3 +108,20 @@ class InterpolateRalfTable(object):
         ind_orders = np.argmax(cumprob > np.random.rand(len(energies)), axis=0)
 
         return orders[ind_orders], totalprob
+
+
+class RalfQualityFactor(OpticalElement):
+    '''Scale probabilites of theoretical curves to measured values.
+
+    All gratings look better in theory than in practice. This grating quality factor
+    scales the claculated diffraction probabilities to other parter instruments.
+    '''
+
+    def __init__(**kwargs):
+        self.sigma = kwargs.pop('sigma')
+        self.d = pwargs.pop('d')
+        suber(RalfQualityFactor, self).__init__(**kwargs)
+
+    def process_photons(self, photons):
+        ind = np.isfinite(photons['order'])
+        ind['probability'] *= np.exp(- (2 * np.pi * self.sigma/self.d)**2)**(photons['order']**2)
