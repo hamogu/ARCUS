@@ -44,8 +44,8 @@ blazeang = 1.91
 # CCDs are ~25 mm wide.
 z_offset_spectra = 5.
 
-alpha = np.deg2rad(2 * blazeang)
-beta = np.deg2rad(4 * blazeang)
+alpha = np.deg2rad(2.2 * blazeang)
+beta = np.deg2rad(4.4 * blazeang)
 R, r, pos4d = design_tilted_torus(12e3, alpha, beta)
 rowland_central = RowlandTorus(R, r, pos4d=pos4d)
 
@@ -160,17 +160,15 @@ gas_2m = RectangularGrid(z_range=[-800 + z_offset_spectra, -300 + z_offset_spect
                          id_num_offset=3000, **gratinggrid)
 gasm = Sequence(elements=[gas_1m, gas_2m, catsupport, catsupportbars, gratquality])
 
+filtersandqe = GlobalEnergyFilter(filterfunc=interp1d(energy, sifiltercurve * uvblocking * opticalblocking * ccdcontam * qebiccd))
 
-flatstackargs = {'zoom': [1, 24.576, 12.288],
-                 'elements': [EnergyFilter, FlatDetector],
-                 'keywords': [{'filterfunc': interp1d(energy, sifiltercurve * uvblocking * opticalblocking * ccdcontam * qebiccd)}, {'pixsize': 0.024}]
-                 }
+detccdargs = {'pixsize': 0.024,'zoom': [1, 24.576, 12.288]}
+
 # 500 mu gap between detectors
-
 det = RowlandCircleArray(rowland=rowland_central,
-                         elem_class=marxs.optics.FlatStack,
-                         elem_args=flatstackargs, d_element=49.652,
-                         theta=[np.pi - 0.2, np.pi + 0.5])
+                         elem_class=FlatDetector,
+                         elem_args=detccdargs,
+                         d_element=49.652, theta=[np.pi - 0.2, np.pi + 0.5])
 
 # This is just one way to establish a global coordinate system for
 # detection on detectors that follow a curved surface.
@@ -204,18 +202,18 @@ detfp.detpix_name = ['detfppix_x', 'detfppix_y']
 detfp.display['opacity'] = 0.1
 
 ### Put together ARCUS in different configurations ###
-arcus = Sequence(elements=[aper, mirror, gas, det, projectfp])
-arcusm = Sequence(elements=[aperm, mirrorm, gasm, det, projectfp])
+arcus = Sequence(elements=[aper, mirror, gas, filtersandqe, det, projectfp])
+arcusm = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe, det, projectfp])
 
 
 keeppos = KeepCol('pos')
 keepposm = KeepCol('pos')
 
-arcus_extra_det = Sequence(elements=[aper, mirror, gas,
+arcus_extra_det = Sequence(elements=[aper, mirror, gas, filtersandqe,
                                      detcirc, detcirc1, detcirc2, det, projectfp, detfp],
                            postprocess_steps=[keeppos])
 
-arcus_extra_det_m = Sequence(elements=[aperm, mirrorm, gasm,
+arcus_extra_det_m = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe,
                                        detcirc, detcirc1, detcirc2, det, projectfp, detfp],
                              postprocess_steps=[keepposm])
 
