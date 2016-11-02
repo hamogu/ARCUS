@@ -4,7 +4,7 @@ from astropy import table
 import astropy.units as u
 from astropy.utils.metadata import enable_merge_strategies
 
-from marxs.source import PointSource, FixedPointing
+from marxs.source import PointSource, JitterPointing
 from marxs import utils
 
 import arcus
@@ -14,7 +14,7 @@ wave = np.arange(8., 50., 0.5) * u.Angstrom
 energies = wave.to(u.keV, equivalencies=u.spectral()).value
 outpath = '../../../Dropbox/ARCUS/rays/semi-compact'
 
-mypointing = FixedPointing(coords=(30, 30.))
+mypointing = JitterPointing(coords=(30, 30.), jitter=arcus.jitter_sigma)
 
 for i, e in enumerate(energies):
     print '{0}/{1}'.format(i + 1, len(energies))

@@ -21,6 +21,9 @@ from read_grating_data import InterpolateRalfTable, RalfQualityFactor
 
 path = os.path.dirname(__file__)
 
+# FWHM is 1.86 arcsec for the jitter
+jitter_sigma = np.deg2rad(1.86 / 2.3545 / 3600.)
+
 # Reading in data for grating reflectivity, filtercurves etc.
 arcusefficiencytable = xlrd.open_workbook(os.path.join(path, '../inputdata/ArcusEffectiveArea-v3.xls'))
 mastersheet = arcusefficiencytable.sheet_by_name('Master')
