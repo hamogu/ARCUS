@@ -219,3 +219,4 @@ arcus_extra_det_m = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe,
 
 # No detector effects - Joern's simulator handles that itself.
 arcus_joern = Sequence(elements=[aper, mirror, gas, detfp])
+arcus_joernm = Sequence(elements=[aperm, mirrorm, gasm, detfp])
