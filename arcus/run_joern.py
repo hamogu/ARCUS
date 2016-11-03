@@ -2,9 +2,11 @@ import os
 import numpy as np
 
 from marxs.source import PointSource, FixedPointing
-
+from marxs import utils
 from astropy.table import Table
 import astropy.units as u
+from astropy import table
+from astropy.utils.metadata import enable_merge_strategies
 from astropy.io import fits
 import arcus
 
@@ -23,7 +25,8 @@ def swapxz(arr):
     temp[:, 0] = arr[:, 2]
     temp[:, 1] = arr[:, 1]
     temp[:, 2] = arr[:, 0]
-    temp[:, 3] = arr[:, 3]
+    # Need a minus sign here to make the new coordinate system right-handed
+    temp[:, 3] = -arr[:, 3]
     return temp
 
 
@@ -46,7 +49,7 @@ def write_joerntables(photons, outdir, ie, indx, offx, indy, offy):
         hdulist[0].header['ORDER'] = (o, 'diffraction order')
         hdulist[0].header['OFFX'] = (offx, 'offset from optical axis in radian')
         hdulist[0].header['OFFY'] = (offy, 'offset from optical axis in radian')
-        hdulist[0].header['N_PHOTONS'] = (n_photons, 'Number of photons per simulation')
+        hdulist[0].header['NPHOTONS'] = (n_photons, 'Number of photons per simulation')
         hdulist.close()
 
 for ix, offx in enumerate(pointing_offsets):
@@ -54,10 +57,19 @@ for ix, offx in enumerate(pointing_offsets):
         for ie, e in enumerate(energies):
             print ix, iy, ie
             mysource = PointSource((0., 0.), energy=e, flux=1.)
-            photons = mysource.generate_photons(n_photons)
+            photons = mysource.generate_photons(n_photons / 2)
 
             mypointing = FixedPointing(coords=(np.rad2deg(offx),
                                                np.rad2deg(offy)))
             photons = mypointing(photons)
             photons = arcus.arcus_joern(photons)
+
+            photonsm = mysource.generate_photons(n_photons / 2)
+            photonsm = mypointing(photonsm)
+            photonsm = arcus.arcus_joernm(photonsm)
+            photonsm['aperture'] += 2
+
+            with enable_merge_strategies(utils.MergeIdentical):
+                out = table.vstack([photons, photonsm])
+
             write_joerntables(photons, outdir, ie, ix, offx, iy, offy)
