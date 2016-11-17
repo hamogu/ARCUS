@@ -13,7 +13,7 @@ from marxs.math.pluecker import h2e
 import marxs.visualization.mayavi
 
 
-from arcus import rowland, aper, mirror, gas, catsupport, det
+from arcus.arcus import rowland, aper, mirror, gas, catsupport, det
 
 # Place an additional detector in the focal plane for comparison
 # Detectors are transparent to allow this stuff
@@ -138,23 +138,3 @@ arcusshort.plot(format="mayavi", viewer=fig)
 
 theta, phi = np.mgrid[-0.2 + np.pi:0.2 + np.pi:60j, -1:1:60j]
 rowland.plot(theta=theta, phi=phi, viewer=fig, format='mayavi')
-
-orders = np.arange(-10, 0)
-#fwhm_per_order(gas2, rp.copy(), orders)
-
-
-# if len(orders) != data.shape[0]:
-#     raise ValueError('First dimension of "data" must match length of "orders".')
-# if len(energy) != data.shape[1]:
-#     raise ValueError('Second dimension of "data" must match length of "energy".')
-
-# weights = np.zeros_like(data)
-# for i, o in enumerate(orders):
-#     ind_o = (gratingeff.orders == o).nonzero()[0]
-#     if len(ind_o) != 1:
-#         raise KeyError('No data for order {0} in gratingeff'.format(o))
-#     en_sort = np.argsort(gratingeff.energy)
-#     weights[o, :] = np.interp(energy, gratingeff.energy[en_sort],
-#                               gratingeff.prob[:, ind_o[0]][en_sort])
-
-# return np.ma.average(data, axis=0, weights=weights)
