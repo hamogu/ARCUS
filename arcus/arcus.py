@@ -169,7 +169,7 @@ detccdargs = {'pixsize': 0.024,'zoom': [1, 24.576, 12.288]}
 det_16 = RowlandCircleArray(rowland=rowland_central,
                          elem_class=FlatDetector,
                          elem_args=detccdargs,
-                         d_element=49.652, theta=[np.pi - 0.2, np.pi + 0.5])
+                            d_element=49.652, theta=[3.1255, 3.1853, 3.2416, 3.301])
 assert len(det_16.elements) == 16
 
 # Put plenty of CCDs in the focal plane
@@ -212,7 +212,7 @@ detfp.display['opacity'] = 0.1
 ### Put together ARCUS in different configurations ###
 arcus = Sequence(elements=[aper, mirror, gas, filtersandqe, det, projectfp])
 arcusm = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe, det, projectfp])
-arcus_for_plot = Sequence(elements=[aper, mirror, gas, det_16])
+arcus_for_plot = Sequence(elements=[aper, aperm, gas, gasm, det_16])
 
 keeppos = KeepCol('pos')
 keepposm = KeepCol('pos')
