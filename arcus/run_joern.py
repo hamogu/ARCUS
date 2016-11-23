@@ -10,7 +10,7 @@ from astropy.utils.metadata import enable_merge_strategies
 from astropy.io import fits
 import arcus
 
-n_photons = 1e4
+n_photons = 2e5
 
 wave = np.arange(8., 50., 0.5) * u.Angstrom
 energies = wave.to(u.keV, equivalencies=u.spectral()).value

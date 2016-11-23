@@ -6,7 +6,7 @@ from marxs import utils
 from marxs.source import PointSource, JitterPointing
 import arcus
 
-n_photons = 2e6
+n_photons = 1e7
 
 EQPegAspec = Table.read('../inputdata/EQPegA_flux.tbl', format='ascii',
                         names=['energy', 'flux'])
@@ -35,4 +35,4 @@ photonsm = arcus.arcus_extra_det_m(photonsm)
 with enable_merge_strategies(utils.MergeIdentical):
     allphot = astropy.table.vstack([photons, photonsm])
 
-allphot.write('/melkor/d1/guenther/Dropbox/ARCUS/rays/EQPegA.fits', overwrite=True)
+allphot.write('/melkor/d1/guenther/Dropbox/ARCUS/rays/EQPegA1e7.fits', overwrite=True)
