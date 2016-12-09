@@ -41,6 +41,7 @@ def write_joerntables(photons, outdir, ie, indx, offx, indy, offy):
         tab['pos'] = swapxz(photons['pos'][ind]) * u.mm
         tab['dir'] = swapxz(photons['dir'][ind]) * u.mm
         tab['time'] = photons['time'][ind] * u.s
+        tab['probability'] = photons['probability'][ind]
         tab.write(filename, overwrite=True)
         # easier to open again to add keywords then use
         # fits interface directly above
@@ -72,4 +73,4 @@ for ix, offx in enumerate(pointing_offsets):
             with enable_merge_strategies(utils.MergeIdentical):
                 out = table.vstack([photons, photonsm])
 
-            write_joerntables(photons, outdir, ie, ix, offx, iy, offy)
+            write_joerntables(out, outdir, ie, ix, offx, iy, offy)
