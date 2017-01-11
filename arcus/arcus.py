@@ -39,7 +39,7 @@ qebiccd = np.array(mastersheet.col_values(24, start_rowx=6))
 # Blaze angle in degrees
 blazeang = 1.91
 
-# We want to different spectral traces in the same array of chips.
+# We want two different spectral traces in the same array of chips.
 # Offset them a little so that the spectra can be separated easily in data analysis.
 # CCDs are ~25 mm wide.
 z_offset_spectra = 5.
@@ -92,21 +92,23 @@ aper_rect2m = optics.RectangleAperture(pos4d=np.dot(shift_optical_axis_12, aper_
 
 aper = optics.MultiAperture(elements=[aper_rect1, aper_rect2])
 aperm = optics.MultiAperture(elements=[aper_rect1m, aper_rect2m])
+aper4 = optics.MultiAperture(elements=[aper_rect1, aper_rect2, aper_rect1m, aper_rect2m])
 
-lens = PerfectLens(focallength=12000., position=entrancepos)
+lens = PerfectLens(focallength=12000., position=entrancepos, zoom=[1, 180, 800])
 lensm = PerfectLens(focallength=12000., pos4d=np.dot(shift_optical_axis_12, lens.pos4d))
 # Scatter as FWHM ~8 arcsec. Divide by 2.3545 to get Gaussian sigma.
 rms = RadialMirrorScatter(inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
                           perpplanescatter=1.5 / 2.345 / 3600. / 180. * np.pi,
-                          position=entrancepos)
+                          pos4d=lens.pos4d)
 
 rmsm = RadialMirrorScatter(inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
                            perpplanescatter=1.5 / 2.345 / 3600. / 180. * np.pi,
-                           pos4d=np.dot(shift_optical_axis_12, rms.pos4d))
+                           pos4d=lensm.pos4d)
 
 
 mirror = Sequence(elements=[lens, rms, mirrorefficiency])
 mirrorm = Sequence(elements=[lensm, rmsm, mirrorefficiency])
+mirror4 = Sequence(elements=[lens, lensm, rms, rmsm, mirrorefficiency])
 
 
 # CAT grating
@@ -119,7 +121,7 @@ order_selector = InterpolateRalfTable(ralfdata)
 catsupport = GlobalEnergyFilter(filterfunc=lambda e: 0.81 * 0.82)
 
 
-class CATSupportbars(marxs.optics.base.OpticalElement):
+class CATSupportbars(marxs.base.SimulationSequenceElement):
     '''Metal structure that holds grating facets will absorb all photons
     that do not pass through a grating facet.
 
@@ -158,7 +160,10 @@ gas_1m = RectangularGrid(z_range=[300 + z_offset_spectra, 800 + z_offset_spectra
 gas_2m = RectangularGrid(z_range=[-800 + z_offset_spectra, -300 + z_offset_spectra],
                          y_range=[-180 + 2* d, 180 + 2 * d],
                          id_num_offset=3000, **gratinggrid)
-gasm = Sequence(elements=[gas_1m, gas_2m, catsupport, catsupportbars, gratquality])
+gasm = Sequence(elements=[gas_1m, gas_2m,
+                          catsupport, catsupportbars, gratquality])
+gas4 = Sequence(elements=[gas_1, gas_2, gas_1m, gas_2m,
+                          catsupport, catsupportbars, gratquality])
 
 filtersandqe = GlobalEnergyFilter(filterfunc=interp1d(energy, sifiltercurve * uvblocking * opticalblocking * ccdcontam * qebiccd))
 
@@ -167,8 +172,8 @@ detccdargs = {'pixsize': 0.024,'zoom': [1, 24.576, 12.288]}
 # 500 mu gap between detectors
 # Place only hand-selected 16 CCDs
 det_16 = RowlandCircleArray(rowland=rowland_central,
-                         elem_class=FlatDetector,
-                         elem_args=detccdargs,
+                            elem_class=FlatDetector,
+                            elem_args=detccdargs,
                             d_element=49.652, theta=[3.1255, 3.1853, 3.2416, 3.301])
 assert len(det_16.elements) == 16
 
@@ -212,6 +217,9 @@ detfp.display['opacity'] = 0.1
 ### Put together ARCUS in different configurations ###
 arcus = Sequence(elements=[aper, mirror, gas, filtersandqe, det, projectfp])
 arcusm = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe, det, projectfp])
+keeppos4 = KeepCol('pos')
+arcus4 = Sequence(elements=[aper4, mirror4, gas4, filtersandqe, det, projectfp],
+                  postprocess_steps=[keeppos4])
 arcus_for_plot = Sequence(elements=[aper, aperm, gas, gasm, det_16])
 
 keeppos = KeepCol('pos')

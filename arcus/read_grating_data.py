@@ -2,7 +2,7 @@ import numpy as np
 import astropy.units as u
 from scipy.interpolate import RectBivariateSpline
 from openpyxl import load_workbook
-from marxs.optics.base import OpticalElement
+from marxs.base import SimulationSequenceElement
 
 
 class DataFileFormatException(Exception):
@@ -111,7 +111,7 @@ class InterpolateRalfTable(object):
         return orders[ind_orders], totalprob
 
 
-class RalfQualityFactor(OpticalElement):
+class RalfQualityFactor(SimulationSequenceElement):
     '''Scale probabilites of theoretical curves to measured values.
 
     All gratings look better in theory than in practice. This grating quality factor
