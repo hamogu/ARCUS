@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.core.umath_tests import inner1d
 
 from transforms3d.euler import euler2mat
 from transforms3d.affines import compose
@@ -12,7 +13,7 @@ class Rod(OpticalElement):
     '''X-axis of the rod is the cylinder axis (x-zoom gives half-length)
     y zoom and z zoom have to be the same (no elliptical cylinders)
     '''
-    col_name = 'hitrod'
+    outcol = 'hitrod'
     display = {'shape': 'cylinder', 'color': 'black'}
 
     def intersect(self, dir, pos):
@@ -43,65 +44,76 @@ class Rod(OpticalElement):
         # ray passes through cylinder caps?
         for fac in [-1, 1]:
             cap_midpoint = self.geometry('center') + fac * self.geometry('v_x')
-            cap_plane = pluecker.point_dir_2plane(cap_midpoint, self.geometry('e_x'))
+            cap_plane = pluecker.point_dir2plane(cap_midpoint, self.geometry('e_x'))
             interpos = pluecker.intersect_line_plane(p_rays, cap_plane)
-            r = np.linalg.norm(h2e(cap_midpoint) - h2e(interpos))
+            r = np.linalg.norm(h2e(cap_midpoint) - h2e(interpos), axis=-1)
             intersect[r < radius]  = True
 
         # Ray passes through the side of a cylinder
         # Note that we don't worry about rays parallel to x because those are
         # tested by passing through the caps already
-        n = norm_vector(np.cross(self.geometry('e_x'), h2e(dir)))
-        d = np.abs(np.dot(n, h2e(self.geometry('center')) - h2e(pos)))
+        n = norm_vector(np.cross(h2e(self.geometry('e_x')), h2e(dir)))
+        d = np.abs(inner1d(n, h2e(self.geometry('center')) - h2e(pos)))
         n2 = norm_vector(np.cross(h2e(dir), n))
-        k = np.dot(h2e(pos) - h2e(self.geometry('center')), n2) / np.dot(self.geometry('e_x'), n2)
-        intersect[(d < radius) & np.abs(k) < height] = True
+        k = inner1d(h2e(pos) - h2e(self.geometry('center')), n2) / inner1d(h2e(self.geometry('e_x')), n2)
+        intersect[(d < radius) & (np.abs(k) < height)] = True
 
         return intersect, None, None
 
     def process_photons(self, photons, intersect, interpos, intercoos):
-        if not self.colname in photons.names:
-            photons[self.colname] = False
-        photons[self.colname][intersect] = True
+        if self.outcol not in photons.colnames:
+            photons[self.outcol] = False
+        photons[self.outcol][intersect] = True
+        return photons
 
 
-# These numbers are here for my notes, not because they can be changed.
-# Below, I've multiplied out some of the sin/cos needed to calculate the
-# dimensions.
-# The boom is unlikely to change in dimension and if it does, all this has to
-# be redone anyway.
+class ThreeSidedBoom(Parallel):
+    '''Three-sided boom with dimensions according to the ARCUS proposal.'''
+    l_longeron = 1.08 * 1e3
+    l_batten = 1.6 * 1e3
+    l_diag = np.sqrt(l_longeron**2 + l_batten**2)
+    d_longeron = 10.2
+    d_batten = 8.
+    d_diag = 2.
 
-l_longeron = 1.08 * 1e3
-l_batten = 1.6 * 1e3
-d_longeron = 10.2 * 20
-d_batten = 8. * 20
-d_diagonal = 2. * 20
-# longeron
-zoom = [l_longeron / 2, d_longeron / 2, d_longeron / 2]
-trans = [l_longeron / 2, l_batten / 3**0.5, 0.]
-rot = np.eye(3)
-pos4d = [compose(trans, rot, zoom)]
+    def __init__(self, **kwargs):
 
-# batten
-zoom = [l_batten / 2, d_batten / 2, d_batten / 2]
-trans = [0., 123.8, 400.]
-rot = euler2mat(np.pi / 2, - np.pi / 6, 0, 'szxz')
-pos4d.append(compose(trans, rot, zoom))
+        kwargs['elem_pos'] = self.pos_spec()
+        kwargs['elem_class'] = Rod
+        kwargs['elem_args'] = {}
+        super(ThreeSidedBoom, self).__init__(**kwargs)
 
-# diagonal1
-zoom = [(l_longeron**2 + l_batten**2)**0.5 / 2.,
-        d_diagonal / 2., d_diagonal / 2.]
-trans = [l_longeron / 2., 123.8, 400.]
-rot = euler2mat(np.deg2rad(90. - 34.03), -np.pi / 6, 0, 'szxz')
-pos4d.append(compose(trans, rot, zoom))
+    def pos_spec(self):
+        '''Calculate pos4d matrices for each element on the boom'''
+        # longeron
+        zoom = [self.l_longeron / 2, self.d_longeron / 2, self.d_longeron / 2]
+        trans = [self.l_longeron / 2, self.l_batten / 3**0.5, 0.]
+        rot = np.eye(3)
+        pos4d = [compose(trans, rot, zoom)]
 
-# diagonal2
-rot = euler2mat(np.deg2rad(90. + 34.03), -np.pi / 6, 0, 'szxz')
-pos4d.append(compose(trans, rot, zoom))
+        # batten
+        zoom = [self.l_batten / 2, self.d_batten / 2, self.d_batten / 2]
+        trans = [0., self.l_batten / 4. / 3**0.5, self.l_batten / 4]
+        rot = euler2mat(np.pi / 2, - np.pi / 6, 0, 'szxz')
+        pos4d.append(compose(trans, rot, zoom))
 
-onestage = Parallel(elem_class=Rod, elem_pos=pos4d)
+        # diagonal1
+        zoom = [self.l_diag / 2., self.d_diag / 2., self.d_diag / 2.]
+        trans[0] = self.l_longeron / 2.
+        rot = euler2mat(np.deg2rad(90. - 34.03), -np.pi / 6, 0, 'szxz')
+        pos4d.append(compose(trans, rot, zoom))
 
-from mayavi import mlab
-from marxs.visualization.mayavi import plot_object
-fig = mlab.figure()
-obj = plot_object(onestage, viewer=fig)
+        # diagonal2
+        rot = euler2mat(np.deg2rad(90. + 34.03), -np.pi / 6, 0, 'szxz')
+        pos4d.append(compose(trans, rot, zoom))
+
+        fullboompos4d = []
+        for h in range(11):
+            trans = [h * self.l_longeron, 0, 0]
+            for i in range(3):
+                rot = euler2mat((i * 2) * np.pi / 3, 0, 0, 'sxyz')
+                affmat = compose(trans, rot, np.ones(3))
+                for p in pos4d:
+                    fullboompos4d.append(np.dot(affmat, p))
+
+        return fullboompos4d

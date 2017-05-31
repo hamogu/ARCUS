@@ -2,17 +2,17 @@ import os
 
 import numpy as np
 import xlrd
+import astropy.units as u
 from scipy.interpolate import interp1d
 import transforms3d
 
 import marxs
 from marxs.simulator import Sequence, KeepCol
-from marxs.optics import (GlobalEnergyFilter, EnergyFilter,
+from marxs.optics import (GlobalEnergyFilter,
                           FlatDetector, CATGrating,
                           PerfectLens, RadialMirrorScatter)
 from marxs import optics
 from marxs.design.rowland import (RowlandTorus, design_tilted_torus,
-                                  GratingArrayStructure,
                                   RectangularGrid,
                                   LinearCCDArray, RowlandCircleArray)
 import marxs.analysis
@@ -22,7 +22,7 @@ from read_grating_data import InterpolateRalfTable, RalfQualityFactor
 path = os.path.dirname(__file__)
 
 # FWHM is 1.86 arcsec for the jitter
-jitter_sigma = np.deg2rad(1.86 / 2.3545 / 3600.)
+jitter_sigma = 1.86 * u.arcsec / 2.3545
 
 # Reading in data for grating reflectivity, filtercurves etc.
 arcusefficiencytable = xlrd.open_workbook(os.path.join(path, '../inputdata/ArcusEffectiveArea-v3.xls'))
@@ -94,7 +94,9 @@ aper = optics.MultiAperture(elements=[aper_rect1, aper_rect2])
 aperm = optics.MultiAperture(elements=[aper_rect1m, aper_rect2m])
 aper4 = optics.MultiAperture(elements=[aper_rect1, aper_rect2, aper_rect1m, aper_rect2m])
 
-lens = PerfectLens(focallength=12000., position=entrancepos, zoom=[1, 180, 800])
+# Make lens a little larger than aperture, otherwise an non on-axis ray
+# (from pointing jitter or an off-axis source) might miss the mirror.
+lens = PerfectLens(focallength=12000., position=entrancepos, zoom=[1, 200, 820])
 lensm = PerfectLens(focallength=12000., pos4d=np.dot(shift_optical_axis_12, lens.pos4d))
 # Scatter as FWHM ~8 arcsec. Divide by 2.3545 to get Gaussian sigma.
 rms = RadialMirrorScatter(inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
@@ -215,10 +217,10 @@ detfp.detpix_name = ['detfppix_x', 'detfppix_y']
 detfp.display['opacity'] = 0.1
 
 ### Put together ARCUS in different configurations ###
-arcus = Sequence(elements=[aper, mirror, gas, filtersandqe, det, projectfp])
-arcusm = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe, det, projectfp])
+arcus = Sequence(elements=[aper, mirror, gas, filtersandqe, det_16, projectfp])
+arcusm = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe, det_16, projectfp])
 keeppos4 = KeepCol('pos')
-arcus4 = Sequence(elements=[aper4, mirror4, gas4, filtersandqe, det, projectfp],
+arcus4 = Sequence(elements=[aper4, mirror4, gas4, filtersandqe, det_16, projectfp],
                   postprocess_steps=[keeppos4])
 arcus_for_plot = Sequence(elements=[aper, aperm, gas, gasm, det_16])
 
