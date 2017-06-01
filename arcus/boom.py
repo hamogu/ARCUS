@@ -75,6 +75,7 @@ class ThreeSidedBoom(Parallel):
     d_longeron = 10.2
     d_batten = 8.
     d_diag = 2.
+    n_bays = 10
 
     def __init__(self, **kwargs):
 
@@ -108,7 +109,7 @@ class ThreeSidedBoom(Parallel):
         pos4d.append(compose(trans, rot, zoom))
 
         fullboompos4d = []
-        for h in range(11):
+        for h in range(self.n_bays):
             trans = [h * self.l_longeron, 0, 0]
             for i in range(3):
                 rot = euler2mat((i * 2) * np.pi / 3, 0, 0, 'sxyz')
