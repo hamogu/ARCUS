@@ -18,6 +18,7 @@ from marxs.design.rowland import (RowlandTorus, design_tilted_torus,
 import marxs.analysis
 
 from read_grating_data import InterpolateRalfTable, RalfQualityFactor
+from spo import SPOChannelMirror
 
 path = os.path.dirname(__file__)
 
@@ -69,7 +70,7 @@ shift_optical_axis_2[2, 3] = + z_offset_spectra
 # Relative to optical axis 1
 shift_optical_axis_12 = np.eye(4)
 shift_optical_axis_12[1, 3] = 2. * d
-shift_optical_axis_12[2, 3] = 2.* z_offset_spectra
+shift_optical_axis_12[2, 3] = 2. * z_offset_spectra
 
 rowlandm.pos4d = np.dot(shift_optical_axis_2, rowlandm.pos4d)
 
@@ -92,26 +93,34 @@ aper_rect2m = optics.RectangleAperture(pos4d=np.dot(shift_optical_axis_12, aper_
 
 aper = optics.MultiAperture(elements=[aper_rect1, aper_rect2])
 aperm = optics.MultiAperture(elements=[aper_rect1m, aper_rect2m])
-aper4 = optics.MultiAperture(elements=[aper_rect1, aper_rect2, aper_rect1m, aper_rect2m])
+aper4 = optics.MultiAperture(elements=[aper_rect1, aper_rect2,
+                                       aper_rect1m, aper_rect2m])
 
 # Make lens a little larger than aperture, otherwise an non on-axis ray
 # (from pointing jitter or an off-axis source) might miss the mirror.
-lens = PerfectLens(focallength=12000., position=entrancepos, zoom=[1, 200, 820])
-lensm = PerfectLens(focallength=12000., pos4d=np.dot(shift_optical_axis_12, lens.pos4d))
+lens1 = SPOChannelMirror(position=entrancepos,
+                         id_num_offset=0)
+lens2 = SPOChannelMirror(position=entrancepos,
+                         orientation=transforms3d.euler.euler2mat(np.pi, 0,0,'sxyz'),
+                         id_num_offset=1000)
+lens1m = SPOChannelMirror(pos4d=np.dot(shift_optical_axis_12, lens1.pos4d),
+                          id_num_offset=10000)
+lens2m = SPOChannelMirror(pos4d=np.dot(shift_optical_axis_12, lens2.pos4d),
+                          id_num_offset=11000)
 # Scatter as FWHM ~8 arcsec. Divide by 2.3545 to get Gaussian sigma.
 rms = RadialMirrorScatter(inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
                           perpplanescatter=1.5 / 2.345 / 3600. / 180. * np.pi,
-                          pos4d=lens.pos4d)
+                          position=entrancepos, zoom=[1, 200, 820])
 
 rmsm = RadialMirrorScatter(inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
                            perpplanescatter=1.5 / 2.345 / 3600. / 180. * np.pi,
-                           pos4d=lensm.pos4d)
+                           pos4d=np.dot(shift_optical_axis_12, rms.pos4d))
 
 
-mirror = Sequence(elements=[lens, rms, mirrorefficiency])
-mirrorm = Sequence(elements=[lensm, rmsm, mirrorefficiency])
-mirror4 = Sequence(elements=[lens, lensm, rms, rmsm, mirrorefficiency])
-
+mirror = Sequence(elements=[lens1, lens2, rms, mirrorefficiency])
+mirrorm = Sequence(elements=[lens1m, lens2m, rmsm, mirrorefficiency])
+mirror4 = Sequence(elements=[lens1, lens2, lens1m, lens2m,
+                             rms, rmsm, mirrorefficiency])
 
 # CAT grating
 ralfdata = os.path.join(path, '../inputdata/Si_4um_deep_30pct_dc.xlsx')
@@ -158,10 +167,10 @@ gratinggrid['elem_args']['orientation'] = blazematm
 gratinggrid['normal_spec'] = np.array([0, 2 * d, z_offset_spectra, 1.])
 gas_1m = RectangularGrid(z_range=[300 + z_offset_spectra, 800 + z_offset_spectra],
                          y_range=[-180 + 2 * d, 180 + 2 * d],
-                         id_num_offset=2000, **gratinggrid)
+                         id_num_offset=10000, **gratinggrid)
 gas_2m = RectangularGrid(z_range=[-800 + z_offset_spectra, -300 + z_offset_spectra],
                          y_range=[-180 + 2* d, 180 + 2 * d],
-                         id_num_offset=3000, **gratinggrid)
+                         id_num_offset=11000, **gratinggrid)
 gasm = Sequence(elements=[gas_1m, gas_2m,
                           catsupport, catsupportbars, gratquality])
 gas4 = Sequence(elements=[gas_1, gas_2, gas_1m, gas_2m,
