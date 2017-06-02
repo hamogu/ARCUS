@@ -47,7 +47,9 @@ z_offset_spectra = 5.
 
 alpha = np.deg2rad(2.2 * blazeang)
 beta = np.deg2rad(4.4 * blazeang)
-R, r, pos4d = design_tilted_torus(12e3, alpha, beta)
+max_x_torus = 11.9e3
+
+R, r, pos4d = design_tilted_torus(11.9e3, alpha, beta)
 rowland_central = RowlandTorus(R, r, pos4d=pos4d)
 
 # Now offset that Rowland torus in a z axis by a few mm.
@@ -59,7 +61,7 @@ rowland = RowlandTorus(R, r, pos4d=pos4d)
 rowland.pos4d = np.dot(shift_optical_axis_1, rowland.pos4d)
 
 
-Rm, rm, pos4dm = design_tilted_torus(12e3, - alpha, -beta)
+Rm, rm, pos4dm = design_tilted_torus(max_x_torus, - alpha, -beta)
 rowlandm = RowlandTorus(Rm, rm, pos4d=pos4dm)
 d = r * np.sin(alpha)
 # Relative to z=0 in the center of the CCD strip
@@ -117,10 +119,20 @@ rmsm = RadialMirrorScatter(inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
                            pos4d=np.dot(shift_optical_axis_12, rms.pos4d))
 
 
-mirror = Sequence(elements=[lens1, lens2, rms, mirrorefficiency])
-mirrorm = Sequence(elements=[lens1m, lens2m, rmsm, mirrorefficiency])
+def spomounting(photons):
+    '''Remove photons that do not go through an SPO but hit the
+    frame part of the petal.'''
+    photons['probability'][photons['spo'] < 0] = 0.
+    return photons
+
+
+mirror = Sequence(elements=[lens1, lens2, rms, mirrorefficiency,
+                            spomounting])
+mirrorm = Sequence(elements=[lens1m, lens2m, rmsm, mirrorefficiency,
+                             spomounting])
 mirror4 = Sequence(elements=[lens1, lens2, lens1m, lens2m,
-                             rms, rmsm, mirrorefficiency])
+                             rms, rmsm, mirrorefficiency,
+                             spomounting])
 
 # CAT grating
 ralfdata = os.path.join(path, '../inputdata/Si_4um_deep_30pct_dc.xlsx')
@@ -132,17 +144,14 @@ order_selector = InterpolateRalfTable(ralfdata)
 catsupport = GlobalEnergyFilter(filterfunc=lambda e: 0.81 * 0.82)
 
 
-class CATSupportbars(marxs.base.SimulationSequenceElement):
+def catsupportbars(photons):
     '''Metal structure that holds grating facets will absorb all photons
     that do not pass through a grating facet.
 
     We might want to call this L3 support ;-)
     '''
-    def process_photons(self, photons):
-        photons['probability'][photons['facet'] < 0] = 0.
-        return photons
-
-catsupportbars = CATSupportbars()
+    photons['probability'][photons['facet'] < 0] = 0.
+    return photons
 
 blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-blazeang))
 blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(blazeang))
