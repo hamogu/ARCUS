@@ -68,7 +68,14 @@ class Rod(OpticalElement):
 
 
 class ThreeSidedBoom(Parallel):
-    '''Three-sided boom with dimensions according to the ARCUS proposal.'''
+    '''Three-sided boom with dimensions according to the ARCUS proposal.
+
+    Parameters
+    ----------
+    boom_dims : dict (optional)
+        Entries in `boom_dict` will overwrite class attributes. It's meant
+        to set different dimensions for the boom.
+    '''
     l_longeron = 1.08 * 1e3
     l_batten = 1.6 * 1e3
     l_diag = np.sqrt(l_longeron**2 + l_batten**2)
@@ -78,7 +85,12 @@ class ThreeSidedBoom(Parallel):
     n_bays = 10
 
     def __init__(self, **kwargs):
-
+        boom_dims = kwargs.pop('boom_dimensions', {})
+        for k in boom_dims:
+            if hasattr(self, k):
+                setattr(self, k, boom_dims[k])
+            else:
+                raise ValueError('{} has not attribute {}'.format(self.name, k))
         kwargs['elem_pos'] = self.pos_spec()
         kwargs['elem_class'] = Rod
         kwargs['elem_args'] = {}
