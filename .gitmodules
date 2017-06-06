@@ -1,0 +1,3 @@
+[submodule "caldb-inputdata"]
+	path = caldb-inputdata
+	url = git@bitbucket.org:arcus_xray/caldb-inputdata.git

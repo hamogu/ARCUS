@@ -10,7 +10,7 @@ import marxs
 from marxs.simulator import Sequence, KeepCol
 from marxs.optics import (GlobalEnergyFilter,
                           FlatDetector, CATGrating,
-                          PerfectLens, RadialMirrorScatter)
+                          RadialMirrorScatter)
 from marxs import optics
 from marxs.design.rowland import (RowlandTorus, design_tilted_torus,
                                   RectangularGrid,

@@ -115,7 +115,7 @@ class RalfQualityFactor(SimulationSequenceElement):
     '''Scale probabilites of theoretical curves to measured values.
 
     All gratings look better in theory than in practice. This grating quality factor
-    scales the claculated diffraction probabilities to other parter instruments.
+    scales the calculated diffraction probabilities to the observed performance.
     '''
 
     def __init__(self, **kwargs):
