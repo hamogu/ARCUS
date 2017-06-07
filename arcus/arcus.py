@@ -1,7 +1,4 @@
-import os
-
 import numpy as np
-import xlrd
 import astropy.units as u
 from scipy.interpolate import interp1d
 import transforms3d
@@ -12,30 +9,20 @@ from marxs.optics import (GlobalEnergyFilter,
                           FlatDetector, CATGrating,
                           RadialMirrorScatter)
 from marxs import optics
-from marxs.design.rowland import (RowlandTorus, design_tilted_torus,
+from marxs.design.rowland import (RowlandTorus,
+                                  design_tilted_torus,
                                   RectangularGrid,
                                   LinearCCDArray, RowlandCircleArray)
 import marxs.analysis
 
-from read_grating_data import InterpolateRalfTable, RalfQualityFactor
-from spo import SPOChannelMirror
+from ralfgrating import (InterpolateRalfTable, RalfQualityFactor,
+                         catsupportbars, catsupport)
+from spo import SPOChannelMirror, spogeometricthroughput, doublereflectivity
+from .load_csv import load_number, load_table
+from . import default_verbose as verbose
 
-path = os.path.dirname(__file__)
-
-# FWHM is 1.86 arcsec for the jitter
-jitter_sigma = 1.86 * u.arcsec / 2.3545
-
-# Reading in data for grating reflectivity, filtercurves etc.
-arcusefficiencytable = xlrd.open_workbook(os.path.join(path, '../inputdata/ArcusEffectiveArea-v3.xls'))
-mastersheet = arcusefficiencytable.sheet_by_name('Master')
-energy = np.array(mastersheet.col_values(0, start_rowx=6)) / 1000.  # ev to keV
-spogeometricthroughput = np.array(mastersheet.col_values(3, start_rowx=6))
-doublereflectivity = np.array(mastersheet.col_values(4, start_rowx=6))
-sifiltercurve = np.array(mastersheet.col_values(20, start_rowx=6))
-uvblocking = np.array(mastersheet.col_values(21, start_rowx=6))
-opticalblocking = np.array(mastersheet.col_values(22, start_rowx=6))
-ccdcontam = np.array(mastersheet.col_values(23, start_rowx=6))
-qebiccd = np.array(mastersheet.col_values(24, start_rowx=6))
+jitter_sigma = load_number('other', 'pointingjitter',
+                           'FWHM', verbose=verbose) / 2.3545
 
 # Blaze angle in degrees
 blazeang = 1.91
@@ -76,8 +63,6 @@ shift_optical_axis_12[2, 3] = 2. * z_offset_spectra
 
 rowlandm.pos4d = np.dot(shift_optical_axis_2, rowlandm.pos4d)
 
-
-mirrorefficiency = GlobalEnergyFilter(filterfunc=interp1d(energy, spogeometricthroughput * doublereflectivity))
 
 entrancepos = np.array([12000., 0., -z_offset_spectra])
 
@@ -126,41 +111,30 @@ def spomounting(photons):
     return photons
 
 
-mirror = Sequence(elements=[lens1, lens2, rms, mirrorefficiency,
+mirror = Sequence(elements=[lens1, lens2, rms,
+                            spogeometricthroughput, doublereflectivity,
                             spomounting])
-mirrorm = Sequence(elements=[lens1m, lens2m, rmsm, mirrorefficiency,
+mirrorm = Sequence(elements=[lens1m, lens2m, rmsm,
+                             spogeometricthroughput, doublereflectivity,
                              spomounting])
 mirror4 = Sequence(elements=[lens1, lens2, lens1m, lens2m,
-                             rms, rmsm, mirrorefficiency,
+                             rms, rmsm,
+                             spogeometricthroughput, doublereflectivity,
                              spomounting])
 
 # CAT grating
-ralfdata = os.path.join(path, '../inputdata/Si_4um_deep_30pct_dc.xlsx')
-order_selector = InterpolateRalfTable(ralfdata)
+order_selector = InterpolateRalfTable()
+gratquality = RalfQualityFactor()
 
-# Define L1, L2 blockage as simple filters due to geometric area
-# L1 support: blocks 18 %
-# L2 support: blocks 19 %
-catsupport = GlobalEnergyFilter(filterfunc=lambda e: 0.81 * 0.82)
-
-
-def catsupportbars(photons):
-    '''Metal structure that holds grating facets will absorb all photons
-    that do not pass through a grating facet.
-
-    We might want to call this L3 support ;-)
-    '''
-    photons['probability'][photons['facet'] < 0] = 0.
-    return photons
-
-blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(-blazeang))
-blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]), np.deg2rad(blazeang))
-
-gratquality = RalfQualityFactor(d=200.e-3, sigma=1.75e-3)
+blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]),
+                                             np.deg2rad(-blazeang))
+blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]),
+                                              np.deg2rad(blazeang))
 
 gratinggrid = {'rowland': rowland, 'd_element': 32., 'x_range': [1e4, 1.4e4],
                'elem_class': CATGrating,
-               'elem_args': {'d': 2e-4, 'zoom': [1., 15., 15.], 'orientation': blazemat,
+               'elem_args': {'d': 2e-4, 'zoom': [1., 15., 15.],
+                             'orientation': blazemat,
                              'order_selector': order_selector},
                'normal_spec': np.array([0, 0., -z_offset_spectra, 1.])
               }
@@ -185,7 +159,18 @@ gasm = Sequence(elements=[gas_1m, gas_2m,
 gas4 = Sequence(elements=[gas_1, gas_2, gas_1m, gas_2m,
                           catsupport, catsupportbars, gratquality])
 
-filtersandqe = GlobalEnergyFilter(filterfunc=interp1d(energy, sifiltercurve * uvblocking * opticalblocking * ccdcontam * qebiccd))
+
+def get_filter(dir, name):
+    tab = load_table(dir, name, verbose=verbose)
+    en = tab['energy'].to(u.keV, equivalencies=u.spectral())
+    return GlobalEnergyFilter(filterfunc=interp1d(en, tab[tab.colnames[1]]),
+                              name=name)
+
+filtersandqe = Sequence(elements=[get_filter(*n) for n in [('filters', 'sifilter'),
+                                                           ('filters', 'opticalblocking'),
+                                                           ('filters', 'uvblocking'),
+                                                           ('detectors', 'contam'),
+                                                           ('detectors', 'qe')]])
 
 detccdargs = {'pixsize': 0.024,'zoom': [1, 24.576, 12.288]}
 
@@ -236,9 +221,11 @@ detfp.display['opacity'] = 0.1
 
 ### Put together ARCUS in different configurations ###
 arcus = Sequence(elements=[aper, mirror, gas, filtersandqe, det_16, projectfp])
-arcusm = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe, det_16, projectfp])
+arcusm = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe, det_16,
+                            projectfp])
 keeppos4 = KeepCol('pos')
-arcus4 = Sequence(elements=[aper4, mirror4, gas4, filtersandqe, det_16, projectfp],
+arcus4 = Sequence(elements=[aper4, mirror4, gas4, filtersandqe, det_16,
+                            projectfp],
                   postprocess_steps=[keeppos4])
 arcus_for_plot = Sequence(elements=[aper, aperm, gas, gasm, det_16])
 
@@ -246,11 +233,13 @@ keeppos = KeepCol('pos')
 keepposm = KeepCol('pos')
 
 arcus_extra_det = Sequence(elements=[aper, mirror, gas, filtersandqe,
-                                     detcirc, detcirc1, detcirc2, det, projectfp, detfp],
+                                     detcirc, detcirc1, detcirc2, det,
+                                     projectfp, detfp],
                            postprocess_steps=[keeppos])
 
 arcus_extra_det_m = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe,
-                                       detcirc, detcirc1, detcirc2, det, projectfp, detfp],
+                                       detcirc, detcirc1, detcirc2, det,
+                                       projectfp, detfp],
                              postprocess_steps=[keepposm])
 
 # No detector effects - Joern's simulator handles that itself.
