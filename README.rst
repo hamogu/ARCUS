@@ -36,7 +36,7 @@ working directory
 
 Then, place a file called ``arcus.cfg`` in either the working directory
 where you want to run the simulations or in ``~/.astropy/config/``.
-The file must have the following form:
+The file must have the following form::
 
     [data]
     ## Path to git repository for caldb-inputdata repository
@@ -54,7 +54,7 @@ repository in the step above.
 
 Last, we need to install the arcus module. Since this module is still changing
 frequently, I recommend to get most current version (not just the last released
-version) by doing:
+version) by doing::
 
     git clone https://github.com/hamogu/ARCUS.git
     python setup.py install
