@@ -5,7 +5,6 @@ from marxs.base import SimulationSequenceElement
 from marxs.optics import GlobalEnergyFilter
 
 from .load_csv import load_table2d, load_number
-from . import default_verbose as verbose
 
 
 class InterpolateRalfTable(object):
@@ -40,12 +39,12 @@ class InterpolateRalfTable(object):
     '''
 
     def __init__(self, k=3):
-        wave, theta, orders = load_table2d('gratings', 'efficiency',
-                                           verbose=verbose)
+        wave, theta, names, orders = load_table2d('gratings', 'efficiency')
         theta = theta.to(u.rad)
         # Order is int, we will never interpolate about order,
         # thus, we'll just have
         # len(order) 2d interpolations
+        self.orders = -np.array([int(n[1:]) for n in names])
         self.interpolators = [RectBivariateSpline(wave, theta, d, kx=k, ky=k) for d in orders]
 
     def probabilities(self, energies, pol, blaze):

@@ -11,7 +11,6 @@ from marxs.math.utils import e2h, h2e, norm_vector
 from marxs.math.polarization import parallel_transport
 
 from .load_csv import load_table, load_number
-from . import default_verbose as verbose
 
 inplanescatter = 10. / 2.3545 / 3600 / 180. * np.pi
 perpplanescatter = 1.5 / 2.345 / 3600. / 180. * np.pi
@@ -19,7 +18,7 @@ perpplanescatter = 1.5 / 2.345 / 3600. / 180. * np.pi
 focallength = 12000.
 
 
-spogeom = load_table('spos', 'petallayout', verbose=verbose)
+spogeom = load_table('spos', 'petallayout')
 spo_pos4d = []
 # Convert angle to quantity here to make sure that unit is taken into account
 for row, ang in zip(spogeom, u.Quantity(spogeom['angle']).to(u.rad).value):
@@ -67,13 +66,13 @@ class SPOChannelasAperture(MultiAperture):
             e.pos4d = np.dot(self.pos4d, e.pos4d)
 
 spogeometricopening = load_number('spos', 'geometricthroughput',
-                                  'transmission', verbose=verbose)
+                                  'transmission')
 spogeometricthroughput = GlobalEnergyFilter(filterfunc=lambda e: spogeometricopening,
                                             name='SPOgeometricthrougput')
 
 
 def get_reflectivityfilter():
-    tab = load_table('spos', 'reflectivity_simple', verbose=verbose)
+    tab = load_table('spos', 'reflectivity_simple')
     en = tab['energy'].to(u.keV, equivalencies=u.spectral())
     return GlobalEnergyFilter(filterfunc=interp1d(en, tab['reflectivity']**2),
                               name='double relectivity')

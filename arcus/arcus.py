@@ -19,10 +19,9 @@ from ralfgrating import (InterpolateRalfTable, RalfQualityFactor,
                          catsupportbars, catsupport)
 from spo import SPOChannelMirror, spogeometricthroughput, doublereflectivity
 from .load_csv import load_number, load_table
-from . import default_verbose as verbose
 
 jitter_sigma = load_number('other', 'pointingjitter',
-                           'FWHM', verbose=verbose) / 2.3545
+                           'FWHM') / 2.3545
 
 # Blaze angle in degrees
 blazeang = 1.91
@@ -161,7 +160,7 @@ gas4 = Sequence(elements=[gas_1, gas_2, gas_1m, gas_2m,
 
 
 def get_filter(dir, name):
-    tab = load_table(dir, name, verbose=verbose)
+    tab = load_table(dir, name)
     en = tab['energy'].to(u.keV, equivalencies=u.spectral())
     return GlobalEnergyFilter(filterfunc=interp1d(en, tab[tab.colnames[1]]),
                               name=name)
