@@ -32,7 +32,7 @@ of the ARCUS collaboration, contact Adam for access.).
 The following command will download that repository into your current
 working directory
 
-    get clone git@bitbucket.org:arcus_xray/caldb-inputdata.git
+    git clone git@bitbucket.org:arcus_xray/caldb-inputdata.git
 
 Then, place a file called ``arcus.cfg`` in either the working directory
 where you want to run the simulations or in ``~/.astropy/config/``.
@@ -51,3 +51,20 @@ The file must have the following form:
 
 where you need to set the path to location where you placed the input data
 repository in the step above.
+
+Last, we need to install the arcus module. Since this module is still changing
+frequently, I recommend to get most current version (not just the last released
+version) by doing:
+
+    git clone https://github.com/hamogu/ARCUS.git
+    python setup.py install
+
+Every time you need a new version of the data files, go into the 
+``caldb-inputdata`` directory and type ``git pull``. Similarly, to update
+the arcus module do ``git pull`` followed by ``pytohn setup.py install``.
+
+Using ARCUS
+-----------
+More detailed instructions will come. For now, please look at Moritz' notebooks
+(they all have a button to show/hide the code, so you can see how the
+calculations are done) and the code itself in the git repository.
