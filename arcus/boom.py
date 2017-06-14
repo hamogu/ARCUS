@@ -8,6 +8,13 @@ from marxs.math import pluecker
 from marxs.math.utils import h2e, norm_vector
 from marxs.simulator import Parallel
 
+# Beware of circular imports if the boom is ever needed
+# inside of arcus.py itself.
+from . import arcus
+# origin of coordinate system is one of the focal points.
+# center boom around mid-point between the two focal points.
+centerpos = [1000., arcus.d, 0]
+
 
 class Rod(OpticalElement):
     '''X-axis of the rod is the cylinder axis (x-zoom gives half-length)

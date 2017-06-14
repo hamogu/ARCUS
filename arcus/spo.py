@@ -25,7 +25,7 @@ for row, ang in zip(spogeom, u.Quantity(spogeom['angle']).to(u.rad).value):
     spo_pos4d.append(compose([0,  # focallength,  # - spogeom[i]['d_from_12m']
                               row['r_mid'] * np.sin(ang),
                               row['r_mid'] * np.cos(ang)],
-                             euler2mat(-np.deg2rad(ang), 0., 0.),
+                             euler2mat(-ang, 0., 0.),
                              [row['height'] / 2.,
                               row['width'] / 2.,
                               row['depth'] / 2.]))
