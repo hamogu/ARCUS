@@ -12,13 +12,14 @@ from marxs import optics
 from marxs.design.rowland import (RowlandTorus,
                                   design_tilted_torus,
                                   RectangularGrid,
-                                  LinearCCDArray, RowlandCircleArray)
+                                  RowlandCircleArray)
 import marxs.analysis
 
 from ralfgrating import (InterpolateRalfTable, RalfQualityFactor,
                          catsupportbars, catsupport)
 from spo import SPOChannelMirror, spogeometricthroughput, doublereflectivity
 from .load_csv import load_number, load_table
+from .utils import tagversion
 
 jitter_sigma = load_number('other', 'pointingjitter',
                            'FWHM') / 2.3545
@@ -219,28 +220,32 @@ detfp.detpix_name = ['detfppix_x', 'detfppix_y']
 detfp.display['opacity'] = 0.1
 
 ### Put together ARCUS in different configurations ###
-arcus = Sequence(elements=[aper, mirror, gas, filtersandqe, det_16, projectfp])
+arcus = Sequence(elements=[aper, mirror, gas, filtersandqe, det_16,
+                           projectfp, tagversion])
 arcusm = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe, det_16,
-                            projectfp])
+                            projectfp, tagversion])
 keeppos4 = KeepCol('pos')
 arcus4 = Sequence(elements=[aper4, mirror4, gas4, filtersandqe, det_16,
-                            projectfp],
+                            projectfp, tagversion],
                   postprocess_steps=[keeppos4])
-arcus_for_plot = Sequence(elements=[aper, aperm, gas, gasm, det_16])
+arcus_for_plot = Sequence(elements=[aper, aperm, gas, gasm, det_16,
+                                    tagversion])
 
 keeppos = KeepCol('pos')
 keepposm = KeepCol('pos')
 
 arcus_extra_det = Sequence(elements=[aper, mirror, gas, filtersandqe,
                                      detcirc, detcirc1, detcirc2, det,
-                                     projectfp, detfp],
+                                     projectfp, detfp,
+                                     tagversion],
                            postprocess_steps=[keeppos])
 
 arcus_extra_det_m = Sequence(elements=[aperm, mirrorm, gasm, filtersandqe,
                                        detcirc, detcirc1, detcirc2, det,
-                                       projectfp, detfp],
+                                       projectfp, detfp,
+                                       tagversion],
                              postprocess_steps=[keepposm])
 
 # No detector effects - Joern's simulator handles that itself.
-arcus_joern = Sequence(elements=[aper, mirror, gas, detfp])
-arcus_joernm = Sequence(elements=[aperm, mirrorm, gasm, detfp])
+arcus_joern = Sequence(elements=[aper, mirror, gas, detfp, tagversion])
+arcus_joernm = Sequence(elements=[aperm, mirrorm, gasm, detfp, tagversion])
