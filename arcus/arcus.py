@@ -234,6 +234,12 @@ arcus_for_plot = Sequence(elements=[aper, aperm, gas, gasm, det_16,
 keeppos = KeepCol('pos')
 keepposm = KeepCol('pos')
 
+arcus_extra_det4 = Sequence(elements=[aper4, mirror4, gas4, filtersandqe,
+                                      detcirc, detcirc1, detcirc2, det,
+                                      projectfp, detfp,
+                                      tagversion],
+                            postprocess_steps=[keeppos])
+
 arcus_extra_det = Sequence(elements=[aper, mirror, gas, filtersandqe,
                                      detcirc, detcirc1, detcirc2, det,
                                      projectfp, detfp,
