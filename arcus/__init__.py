@@ -47,3 +47,5 @@ if not _ASTROPY_SETUP_:
 
     logging.basicConfig(level=conf.logging_level)
     logging.info('Reading configuration data from {}'.format(confs_found))
+
+    from arcus import *

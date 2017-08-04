@@ -3,8 +3,7 @@ import numpy as np
 from marxs.source import PointSource, FixedPointing
 import astropy.units as u
 from astropy.coordinates import SkyCoord
-import arcus
-import arcus.arcus
+from .. import ARCUS
 
 import pytest
 
@@ -15,8 +14,8 @@ mysource = PointSource(coords=SkyCoord(30. * u.deg, 30. * u.deg),
 mypointing = FixedPointing(coords=SkyCoord(30 * u.deg, 30. * u.deg))
 
 
-@pytest.mark.parametrize("instrument", [arcus.arcus.arcus,
-                                        arcus.arcus.arcusm])
+@pytest.mark.parametrize("instrument", [ARCUS(channels=['1', '2']),
+                                        ARCUS(channels=['1m', '2m'])])
 def test_orders_are_focussed(instrument):
     '''Check that the orders look reasonable.
 
@@ -42,7 +41,7 @@ def test_zeroth_order_and_some_dispersed_orders_are_seen():
     '''
     photons = mysource.generate_photons(1e5)
     photons = mypointing(photons)
-    photons = arcus.arcus.arcus4(photons)
+    photons = ARCUS()(photons)
 
     n_det = [((photons['order'] == i) & np.isfinite(photons['det_x'])).sum() for i in range(-12, 1)]
     assert n_det[-1] > 0
@@ -53,7 +52,7 @@ def test_two_optical_axes():
     '''Check that there are two position for the zeroth order.'''
     photons = mysource.generate_photons(1e5)
     photons = mypointing(photons)
-    photons = arcus.arcus.arcus4(photons)
+    photons = ARCUS()(photons)
     i0 = (photons['order'] == 0) & (photons['probability'] > 0)
 
     assert i0.sum() > 500
