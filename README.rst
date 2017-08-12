@@ -61,7 +61,7 @@ version) by doing::
 
 Every time you need a new version of the data files, go into the 
 ``caldb-inputdata`` directory and type ``git pull``. Similarly, to update
-the arcus module do ``git pull`` followed by ``pytohn setup.py install``.
+the arcus module do ``git pull`` followed by ``python setup.py install``.
 
 Using ARCUS
 -----------
