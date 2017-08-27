@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import astropy.units as u
 from scipy.interpolate import interp1d
@@ -138,9 +139,9 @@ gratinggrid = {'rowland': rowland, 'd_element': 32., 'x_range': [1e4, 1.4e4],
                              'order_selector': order_selector},
                'normal_spec': np.array([0, 0., -z_offset_spectra, 1.])
               }
-gas_1 = RectangularGrid(z_range=[300 - z_offset_spectra, 800 - z_offset_spectra],
+gas_1 = RectangularGrid(z_range=[300 - z_offset_spectra, 880 - z_offset_spectra],
                         y_range=[-180, 180], **gratinggrid)
-gas_2 = RectangularGrid(z_range=[-800 + z_offset_spectra, -300 - z_offset_spectra],
+gas_2 = RectangularGrid(z_range=[-880 + z_offset_spectra, -300 - z_offset_spectra],
                         y_range=[-180, 180],
                         id_num_offset=1000, **gratinggrid)
 gas = Sequence(elements=[gas_1, gas_2, catsupport, catsupportbars, gratquality])
@@ -148,10 +149,10 @@ gas = Sequence(elements=[gas_1, gas_2, catsupport, catsupportbars, gratquality])
 gratinggrid['rowland'] = rowlandm
 gratinggrid['elem_args']['orientation'] = blazematm
 gratinggrid['normal_spec'] = np.array([0, 2 * d, z_offset_spectra, 1.])
-gas_1m = RectangularGrid(z_range=[300 + z_offset_spectra, 800 + z_offset_spectra],
+gas_1m = RectangularGrid(z_range=[300 + z_offset_spectra, 880 + z_offset_spectra],
                          y_range=[-180 + 2 * d, 180 + 2 * d],
                          id_num_offset=10000, **gratinggrid)
-gas_2m = RectangularGrid(z_range=[-800 + z_offset_spectra, -300 + z_offset_spectra],
+gas_2m = RectangularGrid(z_range=[-880 + z_offset_spectra, -300 + z_offset_spectra],
                          y_range=[-180 + 2* d, 180 + 2 * d],
                          id_num_offset=11000, **gratinggrid)
 gasm = Sequence(elements=[gas_1m, gas_2m,
@@ -197,19 +198,17 @@ projectfp = marxs.analysis.ProjectOntoPlane()
 detcirc = marxs.optics.CircularDetector.from_rowland(rowland_central, width=20)
 detcirc.loc_coos_name = ['detccent_phi', 'detccent_y']
 detcirc.detpix_name = ['detccentpix_x', 'detccentpix_y']
-detcirc.display['opacity'] = 0.0
+detcirc.display['opacity'] = 0.1  # for all elements of this class
 
 # Place an additional detector on the Rowland circle.
 detcirc2 = marxs.optics.CircularDetector.from_rowland(rowlandm, width=20)
 detcirc2.loc_coos_name = ['detc2_phi', 'detc2_y']
 detcirc2.detpix_name = ['detc2pix_x', 'detc2pix_y']
-detcirc2.display['opacity'] = 0.1
 
 # Place an additional detector on the Rowland circle.
 detcirc1 = marxs.optics.CircularDetector.from_rowland(rowland, width=20)
 detcirc1.loc_coos_name = ['detc1_phi', 'detc1_y']
 detcirc1.detpix_name = ['detc1_x', 'detc1_y']
-detcirc1.display['opacity'] = 0.1
 
 
 # Place an additional detector in the focal plane for comparison
@@ -217,7 +216,11 @@ detcirc1.display['opacity'] = 0.1
 detfp = marxs.optics.FlatDetector(zoom=[.2, 10000, 10000])
 detfp.loc_coos_name = ['detfp_x', 'detfp_y']
 detfp.detpix_name = ['detfppix_x', 'detfppix_y']
+detfp.display = deepcopy(detfp.display)
 detfp.display['opacity'] = 0.1
+
+# but make real detectors orange
+det.elements[0].display['color'] = 'orange'
 
 ### Put together ARCUS in different configurations ###
 arcus = Sequence(elements=[aper, mirror, gas, filtersandqe, det_16,
