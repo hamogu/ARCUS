@@ -3,8 +3,7 @@ import numpy as np
 from marxs.source import PointSource, FixedPointing
 import astropy.units as u
 from astropy.coordinates import SkyCoord
-import arcus
-import arcus.arcus
+from .. import Arcus
 
 import pytest
 
@@ -15,8 +14,8 @@ mysource = PointSource(coords=SkyCoord(30. * u.deg, 30. * u.deg),
 mypointing = FixedPointing(coords=SkyCoord(30 * u.deg, 30. * u.deg))
 
 
-@pytest.mark.parametrize("instrument", [arcus.arcus.arcus,
-                                        arcus.arcus.arcusm])
+@pytest.mark.parametrize("instrument", [Arcus(channels=['1', '2']),
+                                        Arcus(channels=['1m', '2m'])])
 def test_orders_are_focussed(instrument):
     '''Check that the orders look reasonable.
 
@@ -24,12 +23,12 @@ def test_orders_are_focussed(instrument):
     changed later, but still check that all light is focused to
     one point to detect error in setting up the mirrors.
     '''
-    photons = mysource.generate_photons(1e5)
+    photons = mysource.generate_photons(2e4)
     photons = mypointing(photons)
     photons = instrument(photons)
 
     for i in range(-12, 1):
-        ind = (photons['order'] == i) & np.isfinite(photons['det_x'])
+        ind = (photons['order'] == i) & np.isfinite(photons['det_x']) & (photons['probability'] > 0)
         if ind.sum() > 100:
             assert np.std(photons['det_y'][ind]) < 1
             assert np.std(photons['det_x'][ind]) < 1
@@ -38,11 +37,11 @@ def test_orders_are_focussed(instrument):
 
 def test_zeroth_order_and_some_dispersed_orders_are_seen():
     '''test that both the zeroth order and some of the dispersed
-    order are positioned in the detector.
+    orders are positioned in the detector.
     '''
-    photons = mysource.generate_photons(1e5)
+    photons = mysource.generate_photons(2e4)
     photons = mypointing(photons)
-    photons = arcus.arcus.arcus4(photons)
+    photons = Arcus()(photons)
 
     n_det = [((photons['order'] == i) & np.isfinite(photons['det_x'])).sum() for i in range(-12, 1)]
     assert n_det[-1] > 0
@@ -53,9 +52,27 @@ def test_two_optical_axes():
     '''Check that there are two position for the zeroth order.'''
     photons = mysource.generate_photons(1e5)
     photons = mypointing(photons)
-    photons = arcus.arcus.arcus4(photons)
-    i0 = (photons['order'] == 0) & (photons['probability'] > 0)
+    photons = Arcus()(photons)
+    i0 = (photons['order'] == 0) & np.isfinite(photons['det_x']) & (photons['probability'] > 0)
 
     assert i0.sum() > 500
     assert np.std(photons['det_y'][i0]) > 1
     assert np.std(photons['det_x'][i0]) > 1
+
+
+@pytest.mark.parametrize("instrum, expected_area",
+                         [(Arcus(), 800 * u.cm**2),
+                          (Arcus(channels=['1', '2']), 400 * u.cm**2),
+                          (Arcus(channels=['1m', '2m']), 400 * u.cm**2)])
+def test_effective_area(instrum, expected_area):
+    '''Surely, the effective area of Arcus will eveolve a little when the code is
+    changed to accomendate e.g. a slightly different mounting for the gratings,
+    but if the effective area drops or increases dramatically, that is more likely
+    a sign for a bug in the code.'''
+    photons = mysource.generate_photons(2e4)
+    photons = mypointing(photons)
+    photons = instrum(photons)
+    ind = np.isfinite(photons['det_x'])
+    a_eff = np.sum(photons['probability'][ind]) / len(photons) * instrum.elements[0].area
+    assert a_eff > 0.7 * expected_area
+    assert a_eff < 1.3 * expected_area
