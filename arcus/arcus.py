@@ -29,7 +29,7 @@ jitter_sigma = load_number('other', 'pointingjitter',
 
 
 geometry = {'blazeang': 1.91, # Blaze angle in degrees
-            'z_offset_spectra': 5., # Offset of eahc of the two spectra from CCD center
+            'z_offset_spectra': 5., # Offset of each of the two spectra from CCD center
             'alpha': np.deg2rad(2.2 * 1.91),
             'beta': np.deg2rad(4.4 * 1.91),
             'max_x_torus': 11.9e3}
@@ -64,7 +64,7 @@ def derive_rowland_and_shiftmatrix(geometry):
     out['shift_optical_axis_12'][1, 3] = 2. * out['d']
     out['shift_optical_axis_12'][2, 3] = 2. * geometry['z_offset_spectra']
 
-    out['rowlandm.pos4d'] = np.dot(out['shift_optical_axis_2'], out['rowlandm'].pos4d)
+    out['rowlandm'].pos4d = np.dot(out['shift_optical_axis_2'], out['rowlandm'].pos4d)
 
     return out
 
@@ -162,12 +162,12 @@ class CATGratings(Sequence):
             elements.append(RectangularGrid(z_range=[300 - z_offset, 800 - z_offset],
                                             y_range=[-180, 180], **gratinggrid))
         if '2' in channels:
-            elements.append(RectangularGrid(z_range=[-800 + z_offset, -300 - z_offset],
+            elements.append(RectangularGrid(z_range=[-800 - z_offset, -300 - z_offset],
                                             y_range=[-180, 180],
                                             id_num_offset=1000, **gratinggrid))
         gratinggrid['rowland'] = conf['rowlandm']
         gratinggrid['elem_args']['orientation'] = blazematm
-        gratinggrid['normal_spec'] = np.array([0, 2 * conf['d'], z_offset, 1.])
+        gratinggrid['normal_spec'] = np.array([0, 2 * conf['d'], conf['z_offset_spectra'], 1.])
         if '1m' in channels:
             elements.append(RectangularGrid(z_range=[300 + z_offset, 800 + z_offset],
                                             y_range=[-180 + 2 * d, 180 + 2 * d],

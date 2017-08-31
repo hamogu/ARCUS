@@ -55,7 +55,7 @@ def test_two_optical_axes():
     photons = Arcus()(photons)
     i0 = (photons['order'] == 0) & np.isfinite(photons['det_x']) & (photons['probability'] > 0)
 
-    assert i0.sum() > 500
+    assert i0.sum() > 250
     assert np.std(photons['det_y'][i0]) > 1
     assert np.std(photons['det_x'][i0]) > 1
 
