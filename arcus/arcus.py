@@ -12,57 +12,67 @@ from marxs.optics import (GlobalEnergyFilter,
 from marxs import optics
 from marxs.design.rowland import (RowlandTorus,
                                   design_tilted_torus,
-                                  RectangularGrid,
                                   RowlandCircleArray)
 import marxs.analysis
 
 from ralfgrating import (InterpolateRalfTable, RalfQualityFactor,
-                         catsupportbars, catsupport)
+                         catsupportbars, catsupport,
+                         RectangularGrid)
 import spo
 from .load_csv import load_number, load_table
 from .utils import tagversion
 
-__all__ = ['jitter_sigma', 'Arcus', 'ArcusForPlot', 'ArcusForSIXTE']
+__all__ = ['xyz2zxy',
+           'jitter_sigma',
+           'Arcus', 'ArcusForPlot', 'ArcusForSIXTE']
 
 jitter_sigma = load_number('other', 'pointingjitter',
                            'FWHM') / 2.3545
 
 
 geometry = {'blazeang': 1.91, # Blaze angle in degrees
-            'z_offset_spectra': 5., # Offset of each of the two spectra from CCD center
+            'offset_spectra': 5., # Offset of each of the two spectra from CCD center
             'alpha': np.deg2rad(2.2 * 1.91),
             'beta': np.deg2rad(4.4 * 1.91),
-            'max_x_torus': 11.9e3}
+            'max_z_torus': 11.9e3}
+
+xyz2zxy = np.array([[ 0.,  1.,  0.,  0.],
+                    [ 0.,  0.,  1.,  0.],
+                    [ 1.,  0.,  0.,  0.],
+                    [ 0.,  0.,  0.,  1.]])
 
 def derive_rowland_and_shiftmatrix(geometry):
-    R, r, pos4d = design_tilted_torus(geometry['max_x_torus'],
+    R, r, pos4d = design_tilted_torus(geometry['max_z_torus'],
                                       geometry['alpha'],
                                       geometry['beta'])
     out = {'rowland_central': RowlandTorus(R, r, pos4d=pos4d)}
+    out['rowland_central'].pos4d = np.dot(xyz2zxy, out['rowland_central'].pos4d)
 
     # Now offset that Rowland torus in a z axis by a few mm.
     # Shift is measured from a focal point that hits the center of the CCD strip.
     out['shift_optical_axis_1'] = np.eye(4)
-    out['shift_optical_axis_1'][2, 3] = - geometry['z_offset_spectra']
+    out['shift_optical_axis_1'][1, 3] = - geometry['offset_spectra']
 
     out['rowland'] = RowlandTorus(R, r, pos4d=pos4d)
+    out['rowland'].pos4d = np.dot(xyz2zxy, out['rowland'].pos4d)
     out['rowland'].pos4d = np.dot(out['shift_optical_axis_1'], out['rowland'].pos4d)
 
 
-    Rm, rm, pos4dm = design_tilted_torus(geometry['max_x_torus'],
+    Rm, rm, pos4dm = design_tilted_torus(geometry['max_z_torus'],
                                          - geometry['alpha'],
                                          - geometry['beta'])
     out['rowlandm'] = RowlandTorus(Rm, rm, pos4d=pos4dm)
-    out['d'] = r * np.sin(geometry['alpha'])
-    # Relative to z=0 in the center of the CCD strip
-    out['shift_optical_axis_2'] = np.eye(4)
-    out['shift_optical_axis_2'][1, 3] = 2. * out['d']
-    out['shift_optical_axis_2'][2, 3] = + geometry['z_offset_spectra']
+    out['rowlandm'].pos4d = np.dot(xyz2zxy, out['rowlandm'].pos4d)
 
-    # Relative to optical axis 1
-    out['shift_optical_axis_12'] = np.eye(4)
-    out['shift_optical_axis_12'][1, 3] = 2. * out['d']
-    out['shift_optical_axis_12'][2, 3] = 2. * geometry['z_offset_spectra']
+    out['d'] = r * np.sin(geometry['alpha'])
+    # Relative to origin in the center of the CCD strip
+    out['shift_optical_axis_2'] = np.eye(4)
+    out['shift_optical_axis_2'][0, 3] = 2. * out['d']
+    out['shift_optical_axis_2'][1, 3] = + geometry['offset_spectra']
+
+    # Optical axis 2 relative to optical axis 1
+    out['shift_optical_axis_12'] = np.dot(np.linalg.inv(out['shift_optical_axis_1']),
+                                          out['shift_optical_axis_2'])
 
     out['rowlandm'].pos4d = np.dot(out['shift_optical_axis_2'], out['rowlandm'].pos4d)
 
@@ -76,8 +86,10 @@ class Aperture(optics.MultiAperture):
     def __init__(self, conf, channels=['1', '2', '1m', '2m'], **kwargs):
          # Set a little above entrance pos (the mirror) for display purposes.
         # Thus, needs to be geometrically bigger for off-axis sources.
-        rect1 = optics.RectangleAperture(position=[12200, 0, 550], zoom=[1, 220, 330])
-        rect2 = optics.RectangleAperture(position=[12200, 0, -550], zoom=[1, 220, 330])
+        rect1 = optics.RectangleAperture(position=[0, 550, 12200], zoom=[1, 220, 330],
+                                         orientation=xyz2zxy[:3, :3])
+        rect2 = optics.RectangleAperture(position=[0, -550, 12200], zoom=[1, 220, 330],
+                                         orientation=xyz2zxy[:3, :3])
 
         rect1m = optics.RectangleAperture(pos4d=np.dot(conf['shift_optical_axis_12'], rect1.pos4d))
         rect2m = optics.RectangleAperture(pos4d=np.dot(conf['shift_optical_axis_12'], rect2.pos4d))
@@ -104,32 +116,38 @@ class SimpleSPOs(Sequence):
                  inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
                  perpplanescatter=1.5 / 2.345 / 3600. / 180. * np.pi,
                  **kwargs):
-        entrancepos = np.array([12000., 0., -conf['z_offset_spectra']])
-        entranceposm = np.array([12000., 2. * conf['d'], +conf['z_offset_spectra']])
-        rot180 = transforms3d.euler.euler2mat(np.pi, 0,0,'sxyz')
+        entrancepos = np.array([0., -conf['offset_spectra'], 12000.])
+        entranceposm = np.array([2. * conf['d'], +conf['offset_spectra'], 12000.])
+        rot180 = transforms3d.euler.euler2mat(np.pi, 0,0,'szyx')
         # Make lens a little larger than aperture, otherwise an non on-axis ray
         # (from pointing jitter or an off-axis source) might miss the mirror.
         mirror = []
         if '1' in channels:
             mirror.append(spo.SPOChannelMirror(position=entrancepos,
-                                           id_num_offset=0))
+                                               orientation=xyz2zxy[:3, :3],
+                                               id_num_offset=0))
         if '2' in channels:
-            mirror.append(spo.SPOChannelMirror(position=entrancepos, orientation=rot180,
-                                           id_num_offset=1000))
+            mirror.append(spo.SPOChannelMirror(position=entrancepos,
+                                               orientation=np.dot(rot180, xyz2zxy[:3, :3]),
+                                               id_num_offset=1000))
         if '1m' in channels:
             mirror.append(spo.SPOChannelMirror(position=entranceposm,
-                                           id_num_offset=10000))
+                                               orientation=xyz2zxy[:3, :3],
+                                               id_num_offset=10000))
         if '2m' in channels:
-            mirror.append(spo.SPOChannelMirror(position=entranceposm, orientation=rot180,
-                                           id_num_offset=11000))
+            mirror.append(spo.SPOChannelMirror(position=entranceposm,
+                                               orientation=np.dot(rot180, xyz2zxy[:3, :3]),
+                                               id_num_offset=11000))
         if ('1' in channels) or ('2' in channels):
             mirror.append(RadialMirrorScatter(inplanescatter=inplanescatter,
                                               perpplanescatter=perpplanescatter,
-                                              position=entrancepos, zoom=[1, 220, 900]))
+                                              position=entrancepos, zoom=[1, 220, 900],
+                                              orientation=xyz2zxy[:3, :3]))
         if ('1m' in channels) or ('2m' in channels):
             mirror.append(RadialMirrorScatter(inplanescatter=inplanescatter,
                                               perpplanescatter=perpplanescatter,
-                                              position=entranceposm, zoom=[1, 220, 900]))
+                                              position=entranceposm, zoom=[1, 220, 900],
+                                              orientation=xyz2zxy[:3, :3]))
         mirror.append(spomounting)
         super(SimpleSPOs, self).__init__(elements=mirror, **kwargs)
 
@@ -143,38 +161,38 @@ class CATGratings(Sequence):
 
         self.order_selector = self.order_selector_class()
         self.gratquality = self.gratquality_class()
-        blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]),
+        blazemat = transforms3d.axangles.axangle2mat(np.array([0, 1, 0]),
                                                           np.deg2rad(-conf['blazeang']))
-        blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]),
+        blazematm = transforms3d.axangles.axangle2mat(np.array([0, 1, 0]),
                                                            np.deg2rad(conf['blazeang']))
 
         gratinggrid = {'rowland': conf['rowland'],
-                       'd_element': 32., 'x_range': [1e4, 1.4e4],
+                       'd_element': 32., 'z_range': [1e4, 1.4e4],
                        'elem_class': CATGrating,
                        'elem_args': {'d': 2e-4, 'zoom': [1., 15., 15.],
                                      'orientation': blazemat,
                                      'order_selector': self.order_selector},
-                       'normal_spec': np.array([0, 0., -conf['z_offset_spectra'], 1.])
+                       'normal_spec': np.array([0, -conf['offset_spectra'], 0., 1.])
         }
-        z_offset = conf['z_offset_spectra']
+        y_offset = conf['offset_spectra']
         d = conf['d']
         if '1' in channels:
-            elements.append(RectangularGrid(z_range=[300 - z_offset, 800 - z_offset],
-                                            y_range=[-180, 180], **gratinggrid))
+            elements.append(RectangularGrid(y_range=[300 - y_offset, 800 - y_offset],
+                                            x_range=[-180, 180], **gratinggrid))
         if '2' in channels:
-            elements.append(RectangularGrid(z_range=[-800 - z_offset, -300 - z_offset],
-                                            y_range=[-180, 180],
+            elements.append(RectangularGrid(y_range=[-800 - y_offset, -300 - y_offset],
+                                            x_range=[-180, 180],
                                             id_num_offset=1000, **gratinggrid))
         gratinggrid['rowland'] = conf['rowlandm']
         gratinggrid['elem_args']['orientation'] = blazematm
-        gratinggrid['normal_spec'] = np.array([0, 2 * conf['d'], conf['z_offset_spectra'], 1.])
+        gratinggrid['normal_spec'] = np.array([2 * conf['d'], y_offset, 0., 1.])
         if '1m' in channels:
-            elements.append(RectangularGrid(z_range=[300 + z_offset, 800 + z_offset],
-                                            y_range=[-180 + 2 * d, 180 + 2 * d],
+            elements.append(RectangularGrid(y_range=[300 + y_offset, 800 + y_offset],
+                                            x_range=[-180 + 2 * d, 180 + 2 * d],
                                             id_num_offset=10000, **gratinggrid))
         if '2m' in channels:
-            elements.append(RectangularGrid(z_range=[-800 + z_offset, -300 + z_offset],
-                                            y_range=[-180 + 2* d, 180 + 2 * d],
+            elements.append(RectangularGrid(y_range=[-800 + y_offset, -300 + y_offset],
+                                            x_range=[-180 + 2* d, 180 + 2 * d],
                                             id_num_offset=11000, **gratinggrid))
         elements.extend([catsupport, catsupportbars, self.gratquality])
         super(CATGratings, self).__init__(elements=elements, **kwargs)
@@ -247,6 +265,8 @@ class FocalPlaneDet(marxs.optics.FlatDetector):
     def __init__(self, **kwargs):
         if ('zoom' not in kwargs) and ('pos4d' not in kwargs):
             kwargs['zoom'] = [.2, 10000, 10000]
+        if ('orientation' not in kwargs) and ('pos4d' not in kwargs):
+            kwargs['orientation'] = xyz2zxy[:3, :3]
         super(FocalPlaneDet, self).__init__(**kwargs)
 
 

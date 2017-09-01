@@ -3,7 +3,7 @@ import numpy as np
 from marxs.source import PointSource, FixedPointing
 import astropy.units as u
 from astropy.coordinates import SkyCoord
-from .. import Arcus
+from .. import Arcus, xyz2zxy
 
 import pytest
 
@@ -11,7 +11,8 @@ e = 0.5
 
 mysource = PointSource(coords=SkyCoord(30. * u.deg, 30. * u.deg),
                        energy=e, flux=1.)
-mypointing = FixedPointing(coords=SkyCoord(30 * u.deg, 30. * u.deg))
+mypointing = FixedPointing(coords=SkyCoord(30 * u.deg, 30. * u.deg),
+                           reference_transform=xyz2zxy)
 
 
 @pytest.mark.parametrize("instrument", [Arcus(channels=['1', '2']),
@@ -61,9 +62,9 @@ def test_two_optical_axes():
 
 
 @pytest.mark.parametrize("instrum, expected_area",
-                         [(Arcus(), 800 * u.cm**2),
-                          (Arcus(channels=['1', '2']), 400 * u.cm**2),
-                          (Arcus(channels=['1m', '2m']), 400 * u.cm**2)])
+                         [(Arcus(), 600 * u.cm**2),
+                          (Arcus(channels=['1', '2']), 300 * u.cm**2),
+                          (Arcus(channels=['1m', '2m']), 300 * u.cm**2)])
 def test_effective_area(instrum, expected_area):
     '''Surely, the effective area of Arcus will eveolve a little when the code is
     changed to accomendate e.g. a slightly different mounting for the gratings,

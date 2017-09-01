@@ -63,3 +63,9 @@ target/
 
 # Editor backup
 *~
+
+# Mac quicklook
+.DS_Store
+
+#astropy template generated files
+arcus/version.py

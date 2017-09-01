@@ -3,6 +3,11 @@ import astropy.units as u
 from scipy.interpolate import RectBivariateSpline
 from marxs.base import SimulationSequenceElement
 from marxs.optics import GlobalEnergyFilter
+from marxs.optics.base import OpticalElement
+from marxs.simulator import ParallelCalculated
+from marxs.math.rotations import ex2vec_fix
+from marxs.math.utils import e2h, h2e
+import transforms3d
 
 from .load_csv import load_table2d, load_number
 
@@ -121,3 +126,91 @@ def catsupportbars(photons):
 
 catsupport = GlobalEnergyFilter(filterfunc=lambda e: load_number('gratings', 'L1support', 'transmission') *
                                 load_number('gratings', 'L2support', 'transmission'))
+
+class RectangularGrid(ParallelCalculated, OpticalElement):
+    '''A collection of diffraction gratings on the Rowland torus.
+
+    This class is similar to ``marxs.design.rowland.RectangularGrid`` but
+    uses different axes.
+
+    When initialized, it places elements in the space available on the
+    Rowland circle, most commonly, this class is used to place grating facets.
+
+    After generation, individual facet positions can be adjusted by hand by
+    editing the attributes `elem_pos` or `elem_uncertainty`. See
+    `marxs.simulation.Parallel` for details.
+
+    After any of the `elem_pos`, `elem_uncertainty` or
+    `uncertainty` is changed, `generate_elements` needs to be
+    called to regenerate the facets on the GAS.
+
+    Parameters
+    ----------
+    rowland : RowlandTorus
+    d_element : float
+        Size of the edge of a element, which is assumed to be flat and square.
+        (``d_element`` can be larger than the actual size of the silicon
+        membrane to accommodate a minimum thickness of the surrounding frame.)
+    z_range: list of 2 floats
+        Minimum and maximum of the x coordinate that is searched for an
+        intersection with the torus. A ray can intersect a torus in up to four
+        points. ``x_range`` specififes the range for the numerical search for
+        the intersection point.
+    x_range, y_range: lost of two floats
+        limits of the rectangular area where gratings are placed.
+
+    '''
+
+    id_col = 'facet'
+
+    def __init__(self, **kwargs):
+        self.x_range = kwargs.pop('x_range')
+        self.y_range = kwargs.pop('y_range')
+        self.z_range = kwargs.pop('z_range')
+        self.rowland = kwargs.pop('rowland')
+        self.d_element = kwargs.pop('d_element')
+        kwargs['pos_spec'] = self.elempos
+        if 'parallel_spec' not in kwargs.keys():
+            kwargs['parallel_spec'] = np.array([0., 0., 1., 0.])
+
+        super(RectangularGrid, self).__init__(**kwargs)
+
+    def elempos(self):
+
+        n_x = int(np.ceil((self.x_range[1] - self.x_range[0]) / self.d_element))
+        n_y = int(np.ceil((self.y_range[1] - self.y_range[0]) / self.d_element))
+
+        # n_y and n_z are rounded up, so they cover a slighty larger range than y/z_range
+        width_y = n_y * self.d_element
+        width_x = n_x * self.d_element
+
+        ypos = np.arange(0.5 * (self.y_range[0] - width_y + self.y_range[1] + self.d_element), self.y_range[1], self.d_element)
+        xpos = np.arange(0.5 * (self.x_range[0] - width_x + self.x_range[1] + self.d_element), self.x_range[1], self.d_element)
+        xpos, ypos = np.meshgrid(xpos, ypos)
+
+        zpos = []
+        for x, y in zip(xpos.flatten(), ypos.flatten()):
+            zpos.append(self.rowland.solve_quartic(x=x, y=y, interval=self.z_range))
+
+        return np.vstack([xpos.flatten(), ypos.flatten(), np.array(zpos), np.ones_like(zpos)]).T
+
+    def calculate_elempos(self):
+        '''Calculate the position of elements based on some algorithm.
+
+        Returns
+        -------
+        pos4d : list of arrays
+            List of affine transformations that bring an optical element centered
+            on the origin of the coordinate system with the active plane in the
+            yz-plane to the required facet position on the Rowland torus.
+        '''
+        pos4d = []
+
+        xyzw = self.elempos()
+        normals = self.get_spec('normal_spec', xyzw)
+        parallels = self.get_spec('parallel_spec', xyzw, normals)
+
+        for i in range(xyzw.shape[0]):
+            rot_mat = ex2vec_fix(h2e(normals[i, :]), h2e(parallels[i, :]))
+            pos4d.append(transforms3d.affines.compose(h2e(xyzw[i, :]), rot_mat, np.ones(3)))
+        return pos4d
