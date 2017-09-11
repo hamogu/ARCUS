@@ -22,7 +22,7 @@ def string_git_info():
     date = subprocess.check_output(['git', 'show', '-s', '--format=%ci',
                                     githash],
                                    cwd=conf.caldb_inputdata)
-    return 'hash: {} - commited on {}'.format(githash, date)
+    return 'hash: {} (commited on {})'.format(githash, date[:-15])
 
 
 def log_tab_metadata(dirname, filename, tab):
