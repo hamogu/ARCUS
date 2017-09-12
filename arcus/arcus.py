@@ -74,7 +74,8 @@ def derive_rowland_and_shiftmatrix(geometry):
     out['shift_optical_axis_12'] = np.dot(np.linalg.inv(out['shift_optical_axis_1']),
                                           out['shift_optical_axis_2'])
 
-    out['rowlandm'].pos4d = np.dot(out['shift_optical_axis_2'], out['rowlandm'].pos4d)
+    out['rowlandm'].pos4d = np.dot(out['shift_optical_axis_2'],
+                                   out['rowlandm'].pos4d)
 
     return out
 
@@ -82,13 +83,16 @@ def derive_rowland_and_shiftmatrix(geometry):
 defaultconf = deepcopy(geometry)
 defaultconf.update(derive_rowland_and_shiftmatrix(defaultconf))
 
+
 class Aperture(optics.MultiAperture):
     def __init__(self, conf, channels=['1', '2', '1m', '2m'], **kwargs):
-         # Set a little above entrance pos (the mirror) for display purposes.
+        # Set a little above entrance pos (the mirror) for display purposes.
         # Thus, needs to be geometrically bigger for off-axis sources.
-        rect1 = optics.RectangleAperture(position=[0, 550, 12200], zoom=[1, 220, 330],
+        rect1 = optics.RectangleAperture(position=[0, 550, 12200],
+                                         zoom=[1, 220, 330],
                                          orientation=xyz2zxy[:3, :3])
-        rect2 = optics.RectangleAperture(position=[0, -550, 12200], zoom=[1, 220, 330],
+        rect2 = optics.RectangleAperture(position=[0, -550, 12200],
+                                         zoom=[1, 220, 330],
                                          orientation=xyz2zxy[:3, :3])
 
         rect1m = optics.RectangleAperture(pos4d=np.dot(conf['shift_optical_axis_12'], rect1.pos4d))
@@ -151,6 +155,7 @@ class SimpleSPOs(Sequence):
         mirror.append(spomounting)
         super(SimpleSPOs, self).__init__(elements=mirror, **kwargs)
 
+
 class CATGratings(Sequence):
     order_selector_class = InterpolateRalfTable
     gratquality_class = RalfQualityFactor
@@ -172,26 +177,28 @@ class CATGratings(Sequence):
                        'elem_args': {'d': 2e-4, 'zoom': [1., 15., 15.],
                                      'orientation': blazemat,
                                      'order_selector': self.order_selector},
-                       'normal_spec': np.array([0, -conf['offset_spectra'], 0., 1.])
+                       'normal_spec': np.array([0, -conf['offset_spectra'], 0., 1.]),
+                       'parallel_spec': np.array([1., 0., 0., 0.])
         }
         y_offset = conf['offset_spectra']
         d = conf['d']
         if '1' in channels:
-            elements.append(RectangularGrid(y_range=[300 - y_offset, 800 - y_offset],
+            elements.append(RectangularGrid(y_range=[300 - y_offset, 900 - y_offset],
                                             x_range=[-180, 180], **gratinggrid))
         if '2' in channels:
-            elements.append(RectangularGrid(y_range=[-800 - y_offset, -300 - y_offset],
+            elements.append(RectangularGrid(y_range=[-900 - y_offset, -300 - y_offset],
                                             x_range=[-180, 180],
                                             id_num_offset=1000, **gratinggrid))
-        gratinggrid['rowland'] = conf['rowlandm']
-        gratinggrid['elem_args']['orientation'] = blazematm
-        gratinggrid['normal_spec'] = np.array([2 * conf['d'], y_offset, 0., 1.])
+        if ('1m' in channels) or ('2m' in channels):
+            gratinggrid['rowland'] = conf['rowlandm']
+            gratinggrid['elem_args']['orientation'] = blazematm
+            gratinggrid['normal_spec'] = np.array([2 * conf['d'], y_offset, 0., 1.])
         if '1m' in channels:
-            elements.append(RectangularGrid(y_range=[300 + y_offset, 800 + y_offset],
+            elements.append(RectangularGrid(y_range=[300 + y_offset, 900 + y_offset],
                                             x_range=[-180 + 2 * d, 180 + 2 * d],
                                             id_num_offset=10000, **gratinggrid))
         if '2m' in channels:
-            elements.append(RectangularGrid(y_range=[-800 + y_offset, -300 + y_offset],
+            elements.append(RectangularGrid(y_range=[-900 + y_offset, -300 + y_offset],
                                             x_range=[-180 + 2* d, 180 + 2 * d],
                                             id_num_offset=11000, **gratinggrid))
         elements.extend([catsupport, catsupportbars, self.gratquality])
@@ -247,7 +254,9 @@ class Det16(DetMany):
 class CircularDetector(marxs.optics.CircularDetector):
     def __init__(self, rowland, name, width=20, **kwargs):
         # Step 1: Get position and size from Rowland torus
-        pos4d_circ = compose([rowland.R, 0, 0], np.eye(3), [rowland.r, rowland.r, width])
+        pos4d_circ = transforms3d.affines.compose([rowland.R, 0, 0],
+                                                  np.eye(3),
+                                                  [rowland.r, rowland.r, width])
         # Step 2: Transform to global coordinate system
         pos4d_circ = np.dot(rowland.pos4d, pos4d_circ)
         # Step 3: Make detector
@@ -305,6 +314,7 @@ class Arcus(Sequence):
                                     postprocess_steps=self.post_process(),
                                     **kwargs)
 
+
 class ArcusForPlot(Arcus):
     def add_detectors(self, conf):
         '''Add detectors to the element list
@@ -314,6 +324,7 @@ class ArcusForPlot(Arcus):
         function makes it easy to override for derived classes.
         '''
         return [Det16(conf)]
+
 
 class ArcusForSIXTE(Arcus):
     def __init__(self, conf=defaultconf, channels=['1', '2', '1m', '2m'], **kwargs):
