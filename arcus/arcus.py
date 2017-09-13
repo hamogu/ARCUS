@@ -166,9 +166,9 @@ class CATGratings(Sequence):
 
         self.order_selector = self.order_selector_class()
         self.gratquality = self.gratquality_class()
-        blazemat = transforms3d.axangles.axangle2mat(np.array([0, 1, 0]),
+        blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]),
                                                           np.deg2rad(-conf['blazeang']))
-        blazematm = transforms3d.axangles.axangle2mat(np.array([0, 1, 0]),
+        blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]),
                                                            np.deg2rad(conf['blazeang']))
 
         gratinggrid = {'rowland': conf['rowland'],

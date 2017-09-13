@@ -76,4 +76,4 @@ def test_effective_area(instrum, expected_area):
     ind = np.isfinite(photons['det_x'])
     a_eff = np.sum(photons['probability'][ind]) / len(photons) * instrum.elements[0].area
     assert a_eff > 0.7 * expected_area
-    assert a_eff < 1.3 * expected_area
+    assert a_eff < 1.5 * expected_area
