@@ -7,8 +7,6 @@ The purpose if this module is to save some typing when running simulations
 from the command line and to make is easier to keep many different test
 scripts in sync to all use the same parameters.
 '''
-import numpy as np
-
 from marxs.source import PointSource, JitterPointing
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -24,6 +22,7 @@ pointingkwargs = {'coords': coords,
                   'reference_transform': xyz2zxy,
                   'jitter': jitter_sigma
                   }
+
 
 class DefaultSource(PointSource):
     '''Default astronomical source for Arcus.
@@ -44,6 +43,7 @@ class DefaultSource(PointSource):
             if k not in kwargs:
                 kwargs[k] = sourcekwargs[k]
         super(DefaultSource, self).__init__(**kwargs)
+
 
 class DefaultPointing(JitterPointing):
     '''Default astronomical source for Arcus.

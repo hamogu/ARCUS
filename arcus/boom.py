@@ -10,10 +10,10 @@ from marxs.simulator import Parallel
 
 # Beware of circular imports if the boom is ever needed
 # inside of arcus.py itself.
-from . import arcus
+from .arcus import defaultconf
 # origin of coordinate system is one of the focal points.
 # center boom around mid-point between the two focal points.
-centerpos = [1000., arcus.d, 0]
+centerpos = [1000., defaultconf['d'], 0]
 
 
 class Rod(OpticalElement):
