@@ -10,10 +10,10 @@ from marxs.simulator import Parallel
 
 # Beware of circular imports if the boom is ever needed
 # inside of arcus.py itself.
-from .arcus import defaultconf
+from .arcus import defaultconf, xyz2zxy
 # origin of coordinate system is one of the focal points.
 # center boom around mid-point between the two focal points.
-centerpos = [1000., defaultconf['d'], 0]
+centerpos = [defaultconf['d'], 0, 1000]
 
 
 class Rod(OpticalElement):
@@ -41,7 +41,7 @@ class Rod(OpticalElement):
             homogeneous coordinates of the intersection point. Values are set
             to ``np.nan`` if no intersection point is found.
         interpos_local : `numpy.ndarray` of shape (N, 2)
-            y and z coordinates in the coordiante system of the active plane.
+            y and z coordinates in the coordinate system of the active plane.
         '''
         p_rays = pluecker.dir_point2line(h2e(dir), h2e(pos))
         radius = np.linalg.norm(self.geometry('v_y'))
@@ -136,4 +136,6 @@ class ThreeSidedBoom(Parallel):
                 for p in pos4d:
                     fullboompos4d.append(np.dot(affmat, p))
 
+        # Now transform the coordinate system
+        fullboompos4d = [np.dot(xyz2zxy, mat) for mat in fullboompos4d]
         return fullboompos4d
