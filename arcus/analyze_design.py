@@ -155,11 +155,18 @@ def make_det_scenarios(p):
                           'scenario_name': '8 CCDs'})
 
     # Scenario 3: Maximize dispersed O VII photons
-    po7 = pdisp[between(pdisp['wave'], [19.9, 22.5])]
+    po7 = pdisp[between(pdisp['wave'], [21.6, 28.01])]
     phistart = ccd8zeroorder(po7)
     det_scenarios.append({'phi_start': phistart,
                           'phi_stop': phistart + angle_covered_by_CCDs(p),
-                          'scenario_name': '8 CCDs, max O VII'})
+                          'scenario_name': 'G1-1 (a/b)'})
+
+    # Scenario 4: Maximize
+    po7 = pdisp[between(pdisp['wave'], [33.7, 40.01])]
+    phistart = ccd8zeroorder(po7)
+    det_scenarios.append({'phi_start': phistart,
+                          'phi_stop': phistart + angle_covered_by_CCDs(p),
+                          'scenario_name': 'G1-1 (c/d)'})
     return det_scenarios
 
 
