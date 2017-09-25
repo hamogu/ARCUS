@@ -65,10 +65,9 @@ class SPOChannelasAperture(MultiAperture):
         for e in self.elements:
             e.pos4d = np.dot(self.pos4d, e.pos4d)
 
-spogeometricopening = load_number('spos', 'geometricthroughput',
-                                  'transmission')
-spogeometricthroughput = GlobalEnergyFilter(filterfunc=lambda e: spogeometricopening,
-                                            name='SPOgeometricthrougput')
+geometricopening = load_number('spos', 'geometricthroughput', 'transmission')
+geometricthroughput = GlobalEnergyFilter(filterfunc=lambda e: geometricopening,
+                                         name='SPOgeometricthrougput')
 
 
 def get_reflectivityfilter():

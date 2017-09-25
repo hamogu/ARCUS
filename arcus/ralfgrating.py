@@ -5,9 +5,6 @@ from marxs.base import SimulationSequenceElement
 from marxs.optics import GlobalEnergyFilter
 from marxs.optics.base import OpticalElement
 from marxs.simulator import ParallelCalculated
-from marxs.math.rotations import ex2vec_fix
-from marxs.math.utils import h2e
-import transforms3d
 
 from .load_csv import load_table2d, load_number
 

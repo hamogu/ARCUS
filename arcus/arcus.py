@@ -152,6 +152,8 @@ class SimpleSPOs(Sequence):
                                               perpplanescatter=perpplanescatter,
                                               position=entranceposm, zoom=[1, 220, 900],
                                               orientation=xyz2zxy[:3, :3]))
+        mirror.append(spo.geometricthroughput)
+        mirror.append(spo.doublereflectivity)
         mirror.append(spomounting)
         super(SimpleSPOs, self).__init__(elements=mirror, **kwargs)
 

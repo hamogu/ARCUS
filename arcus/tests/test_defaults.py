@@ -4,6 +4,7 @@ import astropy.units as u
 from .. import Arcus
 from ..defaults import DefaultSource, DefaultPointing
 
+
 def test_default_source():
     '''Check that the orders look reasonable.
 
@@ -22,8 +23,10 @@ def test_default_source():
         assert np.std(photons['det_x'][ind]) < 1
         assert np.std(photons['det_x'][ind]) < np.std(photons['det_y'][ind])
 
+
 def test_default_source_parameters():
-    '''Make sure that parameters are passed through even if they are different fomr defaults.'''
+    '''Make sure that parameters are passed through even if they are different
+    from defaults.'''
     s = DefaultSource(energy=0.5)
     p = s(10)
     assert np.allclose(p['energy'], 0.5)
