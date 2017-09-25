@@ -15,10 +15,11 @@ from marxs.design.rowland import (RowlandTorus,
                                   RowlandCircleArray)
 import marxs.analysis
 
-from ralfgrating import (InterpolateRalfTable, RalfQualityFactor,
-                         catsupportbars, catsupport,
-                         RectangularGrid)
-import spo
+from .ralfgrating import (InterpolateRalfTable, RalfQualityFactor,
+                          catsupportbars, catsupport,
+                          RectangularGrid)
+from . import spo
+from . import boom
 from .load_csv import load_number, load_table
 from .utils import tagversion
 
@@ -230,7 +231,7 @@ class DetMany(RowlandCircleArray):
     elem_class = FlatDetector
     elem_args = {'pixsize': 0.024, 'zoom': [1, 24.576, 12.288]}
     d_element = elem_args['zoom'][1] * 2 + 0.5  # 500 mu gap between detectors
-    theta = [np.pi - 0.2, np.pi + 0.5]
+    theta = [np.pi - 0.5, np.pi + 0.5]
 
     def __init__(self, conf, **kwargs):
         super(DetMany, self).__init__(rowland=conf['rowland_central'],
@@ -287,6 +288,13 @@ class Arcus(Sequence):
     gratings_class = CATGratings
     filter_and_qe_class = FiltersAndQE
 
+    def add_boom(self, conf):
+        '''Add four sided boom. Only the top two bays contribute any
+        absorption, so we can save time by not modelling the remaining bays.'''
+        return boom.FourSidedBoom(orientation=xyz2zxy[:3, :3],
+                                  position=[conf['d'], 0, 546.],
+                                  boom_dimensions={'start_bay': 6})
+
     def add_detectors(self, conf):
         '''Add detectors to the element list
 
@@ -303,12 +311,14 @@ class Arcus(Sequence):
         self.KeepPos = KeepCol('pos')
         return [self.KeepPos]
 
-    def __init__(self, conf=defaultconf, channels=['1', '2', '1m', '2m'], **kwargs):
+    def __init__(self, conf=defaultconf, channels=['1', '2', '1m', '2m'],
+                 **kwargs):
         list_of_classes = [self.aper_class, self.spo_class,
                            self.gratings_class, self.filter_and_qe_class]
         elem = []
         for c in list_of_classes:
             elem.append(c(conf, channels))
+        elem.append(self.add_boom(conf))
         elem.extend(self.add_detectors(conf))
 
         elem.append(tagversion)
@@ -318,6 +328,11 @@ class Arcus(Sequence):
 
 
 class ArcusForPlot(Arcus):
+
+    def add_boom(self, conf):
+        return boom.FourSidedBoom(orientation=xyz2zxy[:3, :3],
+                                  position=[conf['d'], 0, 546.])
+
     def add_detectors(self, conf):
         '''Add detectors to the element list
 

@@ -8,13 +8,6 @@ from marxs.math import pluecker
 from marxs.math.utils import h2e, norm_vector
 from marxs.simulator import Parallel
 
-# Beware of circular imports if the boom is ever needed
-# inside of arcus.py itself.
-from .arcus import defaultconf, xyz2zxy
-# origin of coordinate system is one of the focal points.
-# center boom around mid-point between the two focal points.
-centerpos = [defaultconf['d'], 0, 1000]
-
 
 class Rod(OpticalElement):
     '''X-axis of the rod is the cylinder axis (x-zoom gives half-length)
@@ -71,11 +64,12 @@ class Rod(OpticalElement):
         if self.outcol not in photons.colnames:
             photons[self.outcol] = False
         photons[self.outcol][intersect] = True
+        photons['probability'][intersect] = 0.
         return photons
 
 
 class ThreeSidedBoom(Parallel):
-    '''Three-sided boom with dimensions according to the ARCUS proposal.
+    '''Three-sided boom with dimensions similar to the Arcus proposal.
 
     Parameters
     ----------
@@ -89,7 +83,10 @@ class ThreeSidedBoom(Parallel):
     d_longeron = 10.2
     d_batten = 8.
     d_diag = 2.
+    start_bay = 0  # If the bottom of a boom does not contribute to the absorption
+                   # setting start_bay to a larger number can shorten the computation time.
     n_bays = 10
+    n_sides = 3
 
     def __init__(self, **kwargs):
         boom_dims = kwargs.pop('boom_dimensions', {})
@@ -103,8 +100,14 @@ class ThreeSidedBoom(Parallel):
         kwargs['elem_args'] = {}
         super(ThreeSidedBoom, self).__init__(**kwargs)
 
-    def pos_spec(self):
-        '''Calculate pos4d matrices for each element on the boom'''
+    def one_window(self):
+        '''Positions for rods on one side of one bay
+
+        Returns
+        -------
+        pos4d : list
+            List of pos4d matrices
+        '''
         # longeron
         zoom = [self.l_longeron / 2, self.d_longeron / 2, self.d_longeron / 2]
         trans = [self.l_longeron / 2, self.l_batten / 3**0.5, 0.]
@@ -126,16 +129,64 @@ class ThreeSidedBoom(Parallel):
         # diagonal2
         rot = euler2mat(np.deg2rad(90. + 34.03), -np.pi / 6, 0, 'szxz')
         pos4d.append(compose(trans, rot, zoom))
+        return pos4d
+
+    def pos_spec(self):
+        '''Calculate pos4d matrices for each element on the boom'''
 
         fullboompos4d = []
-        for h in range(self.n_bays):
+        for h in range(self.start_bay, self.n_bays):
             trans = [h * self.l_longeron, 0, 0]
-            for i in range(3):
-                rot = euler2mat((i * 2) * np.pi / 3, 0, 0, 'sxyz')
+            for i in range(self.n_sides):
+                rot = euler2mat((i * 2) * np.pi / self.n_sides, 0, 0, 'sxyz')
                 affmat = compose(trans, rot, np.ones(3))
-                for p in pos4d:
+                for p in self.one_window():
                     fullboompos4d.append(np.dot(affmat, p))
 
-        # Now transform the coordinate system
-        fullboompos4d = [np.dot(xyz2zxy, mat) for mat in fullboompos4d]
         return fullboompos4d
+
+
+class FourSidedBoom(ThreeSidedBoom):
+    '''Four-sided boom with dimensions according to the ARCUS proposal.
+
+    Parameters
+    ----------
+    boom_dims : dict (optional)
+        Entries in `boom_dict` will overwrite class attributes. It's meant
+        to set different dimensions for the boom.
+    '''
+    l_longeron = 1350.5
+    l_batten = 1308.
+    l_diag = np.sqrt(l_longeron**2 + l_batten**2)
+    d_longeron = 10.2
+    d_batten = 8.43
+    d_diag = 1.85
+    n_bays = 8
+    n_sides = 4
+
+    def one_window(self):
+        '''Calculate pos4d matrices for each element on the boom'''
+        # longeron
+        zoom = [self.l_longeron / 2, self.d_longeron / 2, self.d_longeron / 2]
+        trans = [self.l_longeron / 2, self.l_batten / 2, self.l_batten / 2]
+        rot = np.eye(3)
+        pos4d = [compose(trans, rot, zoom)]
+
+        # batten
+        zoom = [self.l_batten / 2, self.d_batten / 2, self.d_batten / 2]
+        trans = [0., self.l_batten / 2, 0]
+        rot = euler2mat(np.pi / 2, 0, 0, 'syxz')
+        pos4d.append(compose(trans, rot, zoom))
+
+        # diagonal1
+        zoom = [self.l_diag / 2., self.d_diag / 2., self.d_diag / 2.]
+        trans = [self.l_longeron / 2., self.l_batten / 2, 0. ]
+        ang = np.arcsin(self.l_batten / self.l_diag)
+        rot = euler2mat(ang, 0, 0, 'syxz')
+        pos4d.append(compose(trans, rot, zoom))
+
+        # diagonal2
+        rot = euler2mat(- ang, 0, 0, 'syxz')
+        pos4d.append(compose(trans, rot, zoom))
+
+        return pos4d
