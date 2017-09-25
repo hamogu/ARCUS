@@ -291,9 +291,9 @@ class Arcus(Sequence):
     def add_boom(self, conf):
         '''Add four sided boom. Only the top two bays contribute any
         absorption, so we can save time by not modelling the remaining bays.'''
-        return boom.FourSidedBoom(orientation=xyz2zxy[:3, :3],
-                                  position=[conf['d'], 0, 546.],
-                                  boom_dimensions={'start_bay': 6})
+        return [boom.FourSidedBoom(orientation=xyz2zxy[:3, :3],
+                                   position=[conf['d'], 0, 546.],
+                                   boom_dimensions={'start_bay': 6})]
 
     def add_detectors(self, conf):
         '''Add detectors to the element list
@@ -318,7 +318,7 @@ class Arcus(Sequence):
         elem = []
         for c in list_of_classes:
             elem.append(c(conf, channels))
-        elem.append(self.add_boom(conf))
+        elem.extend(self.add_boom(conf))
         elem.extend(self.add_detectors(conf))
 
         elem.append(tagversion)
@@ -330,8 +330,8 @@ class Arcus(Sequence):
 class ArcusForPlot(Arcus):
 
     def add_boom(self, conf):
-        return boom.FourSidedBoom(orientation=xyz2zxy[:3, :3],
-                                  position=[conf['d'], 0, 546.])
+        return [boom.FourSidedBoom(orientation=xyz2zxy[:3, :3],
+                                   position=[conf['d'], 0, 546.])]
 
     def add_detectors(self, conf):
         '''Add detectors to the element list
