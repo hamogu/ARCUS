@@ -193,24 +193,3 @@ class RectangularGrid(ParallelCalculated, OpticalElement):
             zpos.append(self.rowland.solve_quartic(x=x, y=y, interval=self.z_range))
 
         return np.vstack([xpos.flatten(), ypos.flatten(), np.array(zpos), np.ones_like(zpos)]).T
-
-    def calculate_elempos(self):
-        '''Calculate the position of elements based on some algorithm.
-
-        Returns
-        -------
-        pos4d : list of arrays
-            List of affine transformations that bring an optical element centered
-            on the origin of the coordinate system with the active plane in the
-            yz-plane to the required facet position on the Rowland torus.
-        '''
-        pos4d = []
-
-        xyzw = self.elempos()
-        normals = self.get_spec('normal_spec', xyzw)
-        parallels = self.get_spec('parallel_spec', xyzw, normals)
-
-        for i in range(xyzw.shape[0]):
-            rot_mat = ex2vec_fix(h2e(normals[i, :]), h2e(parallels[i, :]))
-            pos4d.append(transforms3d.affines.compose(h2e(xyzw[i, :]), rot_mat, np.ones(3)))
-        return pos4d
