@@ -19,6 +19,7 @@ of the table).
 
 from __future__ import print_function
 
+import os
 import numpy as np
 from astropy.table import Table
 import astropy.units as u
@@ -189,7 +190,7 @@ def summarize_file(filename, orders, make_det_scenarios=make_det_scenarios):
                          [det['phi_start'], det['phi_stop']])]
         aeff_sum = aeff(pdet)
         resolvingpower, res_out, probs = calc_resolution(pdet, orders)
-        out.append({'filename': filename,
+        out.append({'filename': os.path.basename(filename),
                     'aeff': aeff_sum['area'],
                     'res': resolvingpower,
                     'res_per_order': res_out, 'prob_per_order': probs})
