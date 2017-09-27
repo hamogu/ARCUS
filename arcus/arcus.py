@@ -10,9 +10,7 @@ from marxs.optics import (GlobalEnergyFilter,
                           FlatDetector, CATGrating,
                           RadialMirrorScatter)
 from marxs import optics
-from marxs.design.rowland import (RowlandTorus,
-                                  design_tilted_torus,
-                                  RowlandCircleArray)
+from marxs.design.rowland import RowlandCircleArray
 import marxs.analysis
 
 from .ralfgrating import (InterpolateRalfTable, RalfQualityFactor,
@@ -22,6 +20,8 @@ from . import spo
 from . import boom
 from .load_csv import load_number, load_table
 from .utils import tagversion
+from .constants import xyz2zxy
+from .generate_rowland import make_rowland_from_d_BF_R_f
 
 __all__ = ['xyz2zxy',
            'jitter_sigma',
@@ -29,60 +29,10 @@ __all__ = ['xyz2zxy',
 
 jitter_sigma = load_number('other', 'pointingjitter',
                            'FWHM') / 2.3545
-
-
-geometry = {'blazeang': 1.91, # Blaze angle in degrees
-            'offset_spectra': 5., # Offset of each of the two spectra from CCD center
-            'alpha': np.deg2rad(2.2 * 1.91),
-            'beta': np.deg2rad(4.4 * 1.91),
-            'max_z_torus': 11.9e3}
-
-xyz2zxy = np.array([[ 0.,  1.,  0.,  0.],
-                    [ 0.,  0.,  1.,  0.],
-                    [ 1.,  0.,  0.,  0.],
-                    [ 0.,  0.,  0.,  1.]])
-
-def derive_rowland_and_shiftmatrix(geometry):
-    R, r, pos4d = design_tilted_torus(geometry['max_z_torus'],
-                                      geometry['alpha'],
-                                      geometry['beta'])
-    out = {'rowland_central': RowlandTorus(R, r, pos4d=pos4d)}
-    out['rowland_central'].pos4d = np.dot(xyz2zxy, out['rowland_central'].pos4d)
-
-    # Now offset that Rowland torus in a z axis by a few mm.
-    # Shift is measured from a focal point that hits the center of the CCD strip.
-    out['shift_optical_axis_1'] = np.eye(4)
-    out['shift_optical_axis_1'][1, 3] = - geometry['offset_spectra']
-
-    out['rowland'] = RowlandTorus(R, r, pos4d=pos4d)
-    out['rowland'].pos4d = np.dot(xyz2zxy, out['rowland'].pos4d)
-    out['rowland'].pos4d = np.dot(out['shift_optical_axis_1'], out['rowland'].pos4d)
-
-
-    Rm, rm, pos4dm = design_tilted_torus(geometry['max_z_torus'],
-                                         - geometry['alpha'],
-                                         - geometry['beta'])
-    out['rowlandm'] = RowlandTorus(Rm, rm, pos4d=pos4dm)
-    out['rowlandm'].pos4d = np.dot(xyz2zxy, out['rowlandm'].pos4d)
-
-    out['d'] = r * np.sin(geometry['alpha'])
-    # Relative to origin in the center of the CCD strip
-    out['shift_optical_axis_2'] = np.eye(4)
-    out['shift_optical_axis_2'][0, 3] = 2. * out['d']
-    out['shift_optical_axis_2'][1, 3] = + geometry['offset_spectra']
-
-    # Optical axis 2 relative to optical axis 1
-    out['shift_optical_axis_12'] = np.dot(np.linalg.inv(out['shift_optical_axis_1']),
-                                          out['shift_optical_axis_2'])
-
-    out['rowlandm'].pos4d = np.dot(out['shift_optical_axis_2'],
-                                   out['rowlandm'].pos4d)
-
-    return out
-
-
-defaultconf = deepcopy(geometry)
-defaultconf.update(derive_rowland_and_shiftmatrix(defaultconf))
+defaultconf = make_rowland_from_d_BF_R_f(600., 5900.)
+defaultconf['blazeang'] = 1.8
+defaultconf['n_CCDs'] = 16
+defaultconf['phi_det_start'] = 0.04297
 
 
 class Aperture(optics.MultiAperture):
@@ -253,6 +203,30 @@ class Det16(DetMany):
         for e in self.elements:
             e.display = disp
 
+class DetTwoStrips(DetMany):
+    offset_strip = 0.1
+    'Offset for one strip to make chip gaps different in CCD lengths'
+
+    def __init__(self, conf, **kwargs):
+        r = conf['rowland_central'].r
+        phi_m = np.arcsin(conf['d'] / r) + np.pi
+        angle_strip = conf['n_CCDs'] / 2 * self.d_element / r
+        p0 = conf['phi_det_start']
+        offset = self.offset_strip * self.d_element / r
+        # +- 1e4 at the boundaries, otherwise rounding error can already
+        # and an entire extra CCD
+        self.theta = [phi_m - p0 - angle_strip + 1e-4,
+                      phi_m - p0,
+                      phi_m + p0 + offset,
+                      phi_m + p0 + angle_strip + offset - 1e-4]
+        super(DetTwoStrips, self).__init__(conf, **kwargs)
+        assert len(self.elements) == conf['n_CCDs']
+        # but make real detectors orange
+        disp = deepcopy(self.elements[0].display)
+        disp['color'] = 'orange'
+        for e in self.elements:
+            e.display = disp
+
 
 class CircularDetector(marxs.optics.CircularDetector):
     def __init__(self, rowland, name, width=20, **kwargs):
@@ -302,10 +276,10 @@ class Arcus(Sequence):
         detectors need different parameters. Placing this specific code in it's own
         function makes it easy to override for derived classes.
         '''
-        det16 = Det16(conf)
+        twostrips = DetTwoStrips(conf)
         proj = marxs.analysis.ProjectOntoPlane()
         detfp = FocalPlaneDet()
-        return [det16, proj, detfp]
+        return [twostrips, proj, detfp]
 
     def post_process(self):
         self.KeepPos = KeepCol('pos')
@@ -340,7 +314,7 @@ class ArcusForPlot(Arcus):
         detectors need different parameters. Placing this specific code in it's own
         function makes it easy to override for derived classes.
         '''
-        return [Det16(conf)]
+        return [DetTwoStrips(conf)]
 
 
 class ArcusForSIXTE(Arcus):
@@ -349,5 +323,4 @@ class ArcusForSIXTE(Arcus):
                                             self.gratings_class, FocalPlaneDet()]]
         elem.append(tagversion)
         super(ArcusForSIXTE, self).__init__(elements=elem,
-                                    postprocesss_steps=self.post_process()
-                                    **kwargs)
+                                            **kwargs)

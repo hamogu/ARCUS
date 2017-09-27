@@ -15,8 +15,8 @@ mypointing = FixedPointing(coords=SkyCoord(30 * u.deg, 30. * u.deg),
                            reference_transform=xyz2zxy)
 
 
-@pytest.mark.parametrize("instrument", [Arcus(channels=['1', '2']),
-                                        Arcus(channels=['1m', '2m'])])
+@pytest.mark.parametrize("instrument", [Arcus(channels=['1']),
+                                        Arcus(channels=['2m'])])
 def test_orders_are_focussed(instrument):
     '''Check that the orders look reasonable.
 
