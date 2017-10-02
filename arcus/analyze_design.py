@@ -25,6 +25,7 @@ from astropy.table import Table
 import astropy.units as u
 
 from marxs.analysis import gratings as anagrat
+from marxs.analysis.gratings import resolvingpower_from_photonlist as res_from_list
 
 
 header_vals = ['BLAZE', 'D_CHAN', 'MAX_F', 'CIRCLE_R', 'TORUS_R']
@@ -55,15 +56,8 @@ def angle_covered_by_CCDs(p, n_ccds=8):
 
 
 def add_phifolded(p):
-    # calculate which angles can be covered
-    p.meta['phi_0'] = zero_pos(p)
-
-    # phi at the point excatly half-way between the two channels, the "middle"
-    p.meta['phi_m'] = p.meta['phi_0'] - np.arcsin(p.meta['D_CHAN'] / 2 / p.meta['CIRCLE_R'])
-
-    # Distance fomr middle to 0
-    p.meta['dphi_0m'] = abs(p.meta['phi_0'] - p.meta['phi_m'])
-
+    p['phi_m'] = np.arcsin(p.meta['D_CHAN'] / 2 / p.meta['CIRCLE_R'])
+    p['phi_0'] = 2 * p['phi_m']
     # make new column "distance from phi_m"
     p['phi_folded'] = np.abs(p['circ_phi'] - p.meta['phi_m'])
 
@@ -135,7 +129,7 @@ def ccd8zeroorder(p):
     # want that in the range.
     # Don't go +/- 8 CCDs, but a little less, so zeroth order is never
     # exactly on the edge of detector
-    bins = np.arange(p.meta['dphi_0m'] - (ang8 - binwidth), p.meta['dphi_0m'] + (ang8 + binwidth), binwidth)
+    bins = np.arange(p.meta['phi_m'] - (ang8 - binwidth), p.meta['phi_m'] + (ang8 + binwidth), binwidth)
     hist, bin_edges = np.histogram(p['phi_folded'], weights=p['probability'], bins=bins)
     signal = np.cumsum(hist)
     signal8 = signal[80:] - signal[:-80]
@@ -198,3 +192,63 @@ def summarize_file(filename, orders, make_det_scenarios=make_det_scenarios):
         for k in header_vals:
             out[-1][k] = p.meta[k]
     return out, get_wave(p)
+
+
+def new_find_bext(filename, orders, science_requirements):
+    p = load_prepare_table(filename)
+
+    p_wave = p['wave', 'probability', 'circ_phi', 'order'].group_by('wave')
+
+    res_out = np.ma.zeros((len(p_wave.groups), len(orders)))
+    pos_out = np.ma.zeros(res_out.shape)
+    aeff_out = np.ma.zeros(res_out.shape)
+
+    for i, group in enumerate(p_wave.groups):
+        p_waveorder = group.group_by('order')
+        res, pos, std = res_from_list(group, orders, col='circ_phi',
+                                      zeropos=p.meta['phi_0'])
+        res_out[i, :] = res
+        pos_out[i, :] = pos
+
+        p_waveorder = group['order', 'probability'].group_by('order')
+        aeff = p_waveorder.groups.aggregate(np.sum)
+        aeff['probability'] *= p.meta['A_GEOM'] * 4  / p.meta['N_PHOT']
+        # It's possible that not every order has a photon, so groups might be skipped.
+        # Not the most concise wavy to write this, but it works
+        for j, o in enumerate(orders):
+            if o in aeff['order']:
+                aeff_out[i, j] = aeff['probability'][aeff['order'] == o]
+            else:
+                aeff_out[i, j] = np.ma.masked
+
+    mask = ~np.isfinite(res_out)
+    for arr in [res_out, pos_out, aeff_out]:
+        arr.mask = mask
+    pos_folded = np.abs(pos_out - p.meta['phi_m'])
+    wave = get_wave(p)
+
+    stm_require = Table([['G1-1 (a/b)', 'G1-1 (c/d)'],
+                         [2500., 2000.],
+                         [21.6, 33.7],
+                         [28., 40.]],
+                        names=['name', 'min_res', 'min_wave', 'max_wave'])
+    stm_require['n_CCDs'] = 8
+
+    req = stm_require[0]
+    indwave = (wave >= req['min_wave']) & (wave <= req['max_wave'])
+    indres = res_out >= req['min_res']
+
+    ang_cov = angle_covered_by_CCDs(p, n_ccds=req['n_CCDs'])
+    binwidth = angle_covered_by_CCDs(p, n_ccds=0.1)
+
+    tryphi = np.arange(max(0, p.meta['phi_m'] - (ang_cov - binwidth)),
+                       p.meta['phi_m'] - binwidth, binwidth)
+
+    possaeff = np.zeros_like(tryphi)
+    for i, phi in tryphi:
+        possaeff = aeff_out[indwave[:, None] & indres &
+                            (pos_folded > phi) &
+                            (pos_folded < phi + ang_cov)].sum()
+    # There could be more than one bin that has the max aeff
+    # In that case, we want to select something in the middle
+    start_phi = np.mean(tryphi[possaeff == np.max(possaeff)])

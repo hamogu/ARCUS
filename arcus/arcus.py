@@ -203,6 +203,7 @@ class Det16(DetMany):
         for e in self.elements:
             e.display = disp
 
+
 class DetTwoStrips(DetMany):
     offset_strip = 0.1
     'Offset for one strip to make chip gaps different in CCD lengths'
@@ -257,10 +258,14 @@ class FocalPlaneDet(marxs.optics.FlatDetector):
 
 
 class Arcus(Sequence):
+
     aper_class = Aperture
     spo_class = SimpleSPOs
     gratings_class = CATGratings
     filter_and_qe_class = FiltersAndQE
+    '''Set any of these classes to None to not have them included.
+    (e.g. SIXTE does filters and QE itself).
+    '''
 
     def add_boom(self, conf):
         '''Add four sided boom. Only the top two bays contribute any
@@ -291,7 +296,8 @@ class Arcus(Sequence):
                            self.gratings_class, self.filter_and_qe_class]
         elem = []
         for c in list_of_classes:
-            elem.append(c(conf, channels))
+            if c is not None:
+                elem.append(c(conf, channels))
         elem.extend(self.add_boom(conf))
         elem.extend(self.add_detectors(conf))
 
@@ -318,9 +324,7 @@ class ArcusForPlot(Arcus):
 
 
 class ArcusForSIXTE(Arcus):
-    def __init__(self, conf=defaultconf, channels=['1', '2', '1m', '2m'], **kwargs):
-        elem = [c(conf, channels) for c in [self.aper_class, self.spo_class,
-                                            self.gratings_class, FocalPlaneDet()]]
-        elem.append(tagversion)
-        super(ArcusForSIXTE, self).__init__(elements=elem,
-                                            **kwargs)
+    filter_and_qe_class = None
+
+    def add_detectors(self, conf):
+        return [FocalPlaneDet()]
