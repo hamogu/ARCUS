@@ -127,7 +127,7 @@ class CATGratings(Sequence):
         gratinggrid = {'rowland': conf['rowland'],
                        'd_element': 32., 'z_range': [1e4, 1.4e4],
                        'elem_class': CATGrating,
-                       'elem_args': {'d': 2e-4, 'zoom': [1., 15., 15.],
+                       'elem_args': {'d': 2e-4, 'zoom': [1., 13.5, 13.],
                                      'orientation': blazemat,
                                      'order_selector': self.order_selector},
                        'normal_spec': np.array([0, -conf['offset_spectra'], 0., 1.]),
