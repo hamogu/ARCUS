@@ -1,10 +1,15 @@
-'''This module has functions to make up a conf dictionary that specified all the optical parameters
-for Arcus. Several of the parameters depend on each other (e.g. the spaceing between the CTS gratings
-and the focal plane depend on the focal lengths and the spacing between SPOs and CAT gratings),
-so these functions derive the remaining parameters from specific input variables.
+'''This module has functions to make up a conf dictionary that
+specified all the optical parameters for Arcus. Several of the
+parameters depend on each other (e.g. the spaceing between the CTS
+gratings and the focal plane depend on the focal lengths and the
+spacing between SPOs and CAT gratings), so these functions derive the
+remaining parameters from specific input variables.
 
-It would be cool to have a system that could take any combination of parameters and derive
-the remaining ones, but for now, I just handcode those functions that I used.'''
+It would be cool to have a system that could take any combination of
+parameters and derive the remaining ones, but for now, I just handcode
+those functions that I used.
+
+'''
 
 import numpy as np
 from marxs.design.rowland import design_tilted_torus, RowlandTorus
