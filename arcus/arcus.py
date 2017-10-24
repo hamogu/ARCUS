@@ -34,6 +34,11 @@ defaultconf['blazeang'] = 1.8
 defaultconf['n_CCDs'] = 16
 defaultconf['phi_det_start'] = 0.04297
 
+id_num_offset = {'1': 0,
+                 '2': 1000,
+                 '1m': 10000,
+                 '2m': 11000}
+
 
 class Aperture(optics.MultiAperture):
     def __init__(self, conf, channels=['1', '2', '1m', '2m'], **kwargs):
@@ -77,22 +82,14 @@ class SimpleSPOs(Sequence):
         # Make lens a little larger than aperture, otherwise an non on-axis ray
         # (from pointing jitter or an off-axis source) might miss the mirror.
         mirror = []
-        if '1' in channels:
+        for chan in channels:
+            entrancepos = conf['pos_opt_ax'][chan][:3]
+            entrancepos[2] += 12000
+            rot = np.eye(3) if chan in ['1', '1m'] else rot180
             mirror.append(spo.SPOChannelMirror(position=entrancepos,
-                                               orientation=xyz2zxy[:3, :3],
-                                               id_num_offset=0))
-        if '2' in channels:
-            mirror.append(spo.SPOChannelMirror(position=entrancepos,
-                                               orientation=np.dot(rot180, xyz2zxy[:3, :3]),
-                                               id_num_offset=1000))
-        if '1m' in channels:
-            mirror.append(spo.SPOChannelMirror(position=entranceposm,
-                                               orientation=xyz2zxy[:3, :3],
-                                               id_num_offset=10000))
-        if '2m' in channels:
-            mirror.append(spo.SPOChannelMirror(position=entranceposm,
-                                               orientation=np.dot(rot180, xyz2zxy[:3, :3]),
-                                               id_num_offset=11000))
+                                               orientation=np.dot(rot, xyz2zxy[:3, :3]),
+                                               id_num_offset=id_num_offset[chan]))
+        # Get entracepos fopr the the follo9wiung two statements
         if ('1' in channels) or ('2' in channels):
             mirror.append(RadialMirrorScatter(inplanescatter=inplanescatter,
                                               perpplanescatter=perpplanescatter,
@@ -112,6 +109,8 @@ class SimpleSPOs(Sequence):
 class CATGratings(Sequence):
     order_selector_class = InterpolateRalfTable
     gratquality_class = RalfQualityFactor
+    grid_width_x = 180
+    grid_width_y = 300
 
     def __init__(self, conf, channels=['1', '2', '1m', '2m'], **kwargs):
 
@@ -130,30 +129,23 @@ class CATGratings(Sequence):
                        'elem_args': {'d': 2e-4, 'zoom': [1., 13.5, 13.],
                                      'orientation': blazemat,
                                      'order_selector': self.order_selector},
-                       'normal_spec': np.array([0, -conf['offset_spectra'], 0., 1.]),
                        'parallel_spec': np.array([1., 0., 0., 0.])
-        }
-        y_offset = conf['offset_spectra']
-        d = conf['d']
-        if '1' in channels:
-            elements.append(RectangularGrid(y_range=[300 - y_offset, 900 - y_offset],
-                                            x_range=[-180, 180], **gratinggrid))
-        if '2' in channels:
-            elements.append(RectangularGrid(y_range=[-900 - y_offset, -300 - y_offset],
-                                            x_range=[-180, 180],
-                                            id_num_offset=1000, **gratinggrid))
-        if ('1m' in channels) or ('2m' in channels):
-            gratinggrid['rowland'] = conf['rowlandm']
-            gratinggrid['elem_args']['orientation'] = blazematm
-            gratinggrid['normal_spec'] = np.array([2 * conf['d'], y_offset, 0., 1.])
-        if '1m' in channels:
-            elements.append(RectangularGrid(y_range=[300 + y_offset, 900 + y_offset],
-                                            x_range=[-180 + 2 * d, 180 + 2 * d],
-                                            id_num_offset=10000, **gratinggrid))
-        if '2m' in channels:
-            elements.append(RectangularGrid(y_range=[-900 + y_offset, -300 + y_offset],
-                                            x_range=[-180 + 2* d, 180 + 2 * d],
-                                            id_num_offset=11000, **gratinggrid))
+                       }
+        for chan in channels:
+            gratinggrid['rowland'] = conf['rowland_'] + chan
+            b = blazematm if 'm' in chan else blazemat
+            gratinggrid['elem_args']['orientation'] = b
+            gratinggrid['normal_spec'] = conf['pos_opt_ax'][chan]
+            xm, ym = conf['pos_opt_ax'][chan][:2]
+            sig = 1 if chan in ['1', '2'] else -1
+            x_range = [-self.grid_width_x + xm,
+                       +self.grid_width_y + xm]
+            y_range = [sig * (600 - ym - self.grid_width_y),
+                       sig * (600 - ym + self.grid_width_y)]
+            y_range.sort()
+            elements.append(RectangularGrid(x_range=x_range, y_range=y_range,
+                                            id_num_offset=self.id_num_offset[chan],
+                                            **gratinggrid))
         elements.extend([catsupport, catsupportbars, self.gratquality])
         super(CATGratings, self).__init__(elements=elements, **kwargs)
 

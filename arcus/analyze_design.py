@@ -56,8 +56,8 @@ def angle_covered_by_CCDs(p, n_ccds=8):
 
 
 def add_phifolded(p):
-    p['phi_m'] = np.arcsin(p.meta['D_CHAN'] / 2 / p.meta['CIRCLE_R'])
-    p['phi_0'] = 2 * p['phi_m']
+    p.meta['phi_m'] = np.arcsin(p.meta['D_CHAN'] / 2 / p.meta['CIRCLE_R'])
+    p.meta['phi_0'] = 2 * p.meta['phi_m']
     # make new column "distance from phi_m"
     p['phi_folded'] = np.abs(p['circ_phi'] - p.meta['phi_m'])
 

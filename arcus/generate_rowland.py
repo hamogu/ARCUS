@@ -72,50 +72,53 @@ def make_rowland_from_d_BF_R_f(d_BF, R, f=11880.):
     that the spacing between channels d_BF is actually an important parameter
     so it makes sense to use that here to parameterize the torus, too.
 
-    f is the distance between a theoerical on-axis CAT grating and the focal point.
-    It's default is a little smaller than 12 m, to leave space to mount the SPOs.
+    f is the distance between a theoerical on-axis CAT grating and the focal
+    point.  It's default is a little smaller than 12 m, to leave space to mount
+    the SPOs.
+
     '''
+    d = 0.5 * d_BF
     r = 0.5 * np.sqrt(f**2 + d_BF**2)
     alpha = np.arctan2(d_BF, f)
-    pos = [(r + R) * np.sin(alpha), 0, f - (r + R) * np.cos(alpha)]
+    pos = [(r + R) * np.sin(alpha) - d,
+           0, f - (r + R) * np.cos(alpha)]
     orient = [[-np.sin(alpha), np.cos(alpha), 0],
               [0., 0., 1],
               [np.cos(alpha), np.sin(alpha), 0]]
 
-    posm = [(r + R) * np.sin(-alpha), 0, f - (r + R) * np.cos(-alpha)]
+    posm = [(r + R) * np.sin(-alpha) - d,
+            0, f - (r + R) * np.cos(-alpha)]
 
     orientm = [[-np.sin(alpha), -np.cos(alpha), 0],
                [0., 0., 1],
                [-np.cos(alpha), np.sin(alpha), 0]]
 
     geometry = {'d_BF': d_BF,
-                'd': 0.5 * d_BF,
+                'd': d,
                 'f': f,
-                'offset_spectra': 5.,
-                'rowland_central': RowlandTorus(R=R, r=r, position=pos, orientation=orient)}
+                'rowland_central': RowlandTorus(R=R, r=r, position=pos,
+                                                orientation=orient),
+                'rowland_central_m': RowlandTorus(R=R, r=r, position=posm,
+                                                  orientation=orientm)}
+    geometry['pos_opt_ax'] = {'1': [-d, -7.5, 0., 1],
+                              '1m': [d, -2.5, 0, 1],
+                              '2': [-d, +2.5, 0, 1],
+                              '2m': [d, 7.5, 0, 1]}
 
     # Now offset that Rowland torus in a z axis by a few mm.
-    # Shift is measured from a focal point that hits the center of the CCD strip.
-    geometry['shift_optical_axis_1'] = np.eye(4)
-    geometry['shift_optical_axis_1'][1, 3] = - geometry['offset_spectra']
-
-    geometry['rowland'] = RowlandTorus(R, r, pos4d=geometry['rowland_central'].pos4d)
-    geometry['rowland'].pos4d = np.dot(geometry['shift_optical_axis_1'],
-                                       geometry['rowland'].pos4d)
-
-    # Not really needed for a 1 channel run, but some functions in arcus.py
-    # expect those keywords to be present.
-    geometry['shift_optical_axis_2'] = np.eye(4)
-    geometry['shift_optical_axis_2'][0, 3] = d_BF
-    geometry['shift_optical_axis_2'][1, 3] = + geometry['offset_spectra']
-
-    # Optical axis 2 relative to optical axis 1
-    geometry['shift_optical_axis_12'] = np.dot(np.linalg.inv(geometry['shift_optical_axis_1']),
-                                               geometry['shift_optical_axis_2'])
-    geometry['rowland_central_m'] = RowlandTorus(R=R, r=r, position=posm, orientation=orientm)
-    geometry['rowlandm'] = RowlandTorus(R, r, pos4d=geometry['rowland_central_m'].pos4d)
-    geometry['rowlandm'].pos4d = np.dot(geometry['shift_optical_axis_2'],
-                                       geometry['rowlandm'].pos4d)
-
+    # Shift is measured from point on symmetry plane.
+    for channel in geometry['pos_opt_ax']:
+        name = 'shift_optical_axis_' + channel
+        geometry[name] = np.eye(4)
+        geometry[name][:, 3] = geometry['pos_opt_ax'][channel][:]
+        if channel in ['1', '2']:
+            base_rowland = 'rowland_central'
+        elif channel in ['1m', '2m']:
+            base_rowland = 'rowland_centralm'
+        namer = 'rowland_' + channel
+        geometry[namer] = RowlandTorus(R, r,
+                                       pos4d=geometry[base_rowland].pos4d)
+        geometry[namer].pos4d = np.dot(geometry[name],
+                                       geometry[namer].pos4d)
 
     return geometry
