@@ -7,8 +7,7 @@ import transforms3d
 import marxs
 from marxs.simulator import Sequence, KeepCol
 from marxs.optics import (GlobalEnergyFilter,
-                          FlatDetector, CATGrating,
-                          RadialMirrorScatter)
+                          FlatDetector, CATGrating)
 from marxs import optics
 from marxs.design.rowland import RowlandCircleArray
 import marxs.analysis
@@ -40,24 +39,34 @@ id_num_offset = {'1': 0,
                  '2m': 11000}
 
 
+# Set a little above entrance pos (the mirror) for display purposes.
+# Thus, needs to be geometrically bigger for off-axis sources.
+fac = 1.5
+spopos = np.array(spo.spo_pos4d)
+rmid = 0.5 * (spopos[:, 2, 3].max() + spopos[:, 2, 3].min())
+rdim = spopos[:, 2, 3].max() - rmid + fac * spo.spogeom['depth'].max()
+aperzoom = [1, spopos[:, 1, 3].max() + fac * spo.spogeom['width'].max(),
+            rdim]
+
+
 class Aperture(optics.MultiAperture):
     def __init__(self, conf, channels=['1', '2', '1m', '2m'], **kwargs):
-        # Set a little above entrance pos (the mirror) for display purposes.
-        # Thus, needs to be geometrically bigger for off-axis sources.
-        rect1 = optics.RectangleAperture(position=[0, 550, 12200],
-                                         zoom=[1, 220, 330],
-                                         orientation=xyz2zxy[:3, :3])
-        rect2 = optics.RectangleAperture(position=[0, -550, 12200],
-                                         zoom=[1, 220, 330],
-                                         orientation=xyz2zxy[:3, :3])
-
-        rect1m = optics.RectangleAperture(pos4d=np.dot(conf['shift_optical_axis_12'], rect1.pos4d))
-        rect2m = optics.RectangleAperture(pos4d=np.dot(conf['shift_optical_axis_12'], rect2.pos4d))
         apers = []
+        for chan in channels:
+            pos = conf['pos_opt_ax'][chan][:3].copy()
+            pos[2] += 12200
+            if '1' in chan:
+                pos[1] += rmid
+            elif '2' in chan:
+                pos[1] -= rmid
+            else:
+                raise ValueError('No rules for channel {}'.format(chan))
 
-        for a, b in zip(['1', '2', '1m', '2m'], [rect1, rect2, rect1m, rect2m]):
-            if a in channels:
-                apers.append(b)
+            rect = optics.RectangleAperture(position=pos,
+                                            zoom=aperzoom,
+                                            orientation=xyz2zxy[:3, :3])
+            apers.append(rect)
+
         super(Aperture, self).__init__(elements=apers, **kwargs)
         # Prevent aperture edges from overlapping in plot
         self.elements[0].display['outer_factor'] = 2
@@ -76,30 +85,21 @@ class SimpleSPOs(Sequence):
                  inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
                  perpplanescatter=1.5 / 2.345 / 3600. / 180. * np.pi,
                  **kwargs):
-        entrancepos = np.array([0., -conf['offset_spectra'], 12000.])
-        entranceposm = np.array([2. * conf['d'], +conf['offset_spectra'], 12000.])
         rot180 = transforms3d.euler.euler2mat(np.pi, 0,0,'szyx')
         # Make lens a little larger than aperture, otherwise an non on-axis ray
         # (from pointing jitter or an off-axis source) might miss the mirror.
         mirror = []
         for chan in channels:
-            entrancepos = conf['pos_opt_ax'][chan][:3]
+            entrancepos = conf['pos_opt_ax'][chan][:3].copy()
             entrancepos[2] += 12000
-            rot = np.eye(3) if chan in ['1', '1m'] else rot180
+            rot = np.eye(3) if '1' in chan else rot180
             mirror.append(spo.SPOChannelMirror(position=entrancepos,
                                                orientation=np.dot(rot, xyz2zxy[:3, :3]),
                                                id_num_offset=id_num_offset[chan]))
-        # Get entracepos fopr the the follo9wiung two statements
-        if ('1' in channels) or ('2' in channels):
-            mirror.append(RadialMirrorScatter(inplanescatter=inplanescatter,
-                                              perpplanescatter=perpplanescatter,
-                                              position=entrancepos, zoom=[1, 220, 900],
-                                              orientation=xyz2zxy[:3, :3]))
-        if ('1m' in channels) or ('2m' in channels):
-            mirror.append(RadialMirrorScatter(inplanescatter=inplanescatter,
-                                              perpplanescatter=perpplanescatter,
-                                              position=entranceposm, zoom=[1, 220, 900],
-                                              orientation=xyz2zxy[:3, :3]))
+            mirror.append(spo.ScatterPerChannel(position=entrancepos,
+                                                min_id=id_num_offset[chan],
+                                                inplanescatter=inplanescatter,
+                                                perpplanescatter=perpplanescatter))
         mirror.append(spo.geometricthroughput)
         mirror.append(spo.doublereflectivity)
         mirror.append(spomounting)
@@ -109,7 +109,7 @@ class SimpleSPOs(Sequence):
 class CATGratings(Sequence):
     order_selector_class = InterpolateRalfTable
     gratquality_class = RalfQualityFactor
-    grid_width_x = 180
+    grid_width_x = 200
     grid_width_y = 300
 
     def __init__(self, conf, channels=['1', '2', '1m', '2m'], **kwargs):
@@ -123,8 +123,7 @@ class CATGratings(Sequence):
         blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]),
                                                            np.deg2rad(conf['blazeang']))
 
-        gratinggrid = {'rowland': conf['rowland'],
-                       'd_element': 32., 'z_range': [1e4, 1.4e4],
+        gratinggrid = {'d_element': 32., 'z_range': [1e4, 1.4e4],
                        'elem_class': CATGrating,
                        'elem_args': {'d': 2e-4, 'zoom': [1., 13.5, 13.],
                                      'orientation': blazemat,
@@ -132,19 +131,19 @@ class CATGratings(Sequence):
                        'parallel_spec': np.array([1., 0., 0., 0.])
                        }
         for chan in channels:
-            gratinggrid['rowland'] = conf['rowland_'] + chan
+            gratinggrid['rowland'] = conf['rowland_' + chan]
             b = blazematm if 'm' in chan else blazemat
             gratinggrid['elem_args']['orientation'] = b
-            gratinggrid['normal_spec'] = conf['pos_opt_ax'][chan]
-            xm, ym = conf['pos_opt_ax'][chan][:2]
-            sig = 1 if chan in ['1', '2'] else -1
+            gratinggrid['normal_spec'] = conf['pos_opt_ax'][chan].copy()
+            xm, ym = conf['pos_opt_ax'][chan][:2].copy()
+            sig = 1 if '1' in chan else -1
             x_range = [-self.grid_width_x + xm,
-                       +self.grid_width_y + xm]
+                       +self.grid_width_x + xm]
             y_range = [sig * (600 - ym - self.grid_width_y),
                        sig * (600 - ym + self.grid_width_y)]
             y_range.sort()
             elements.append(RectangularGrid(x_range=x_range, y_range=y_range,
-                                            id_num_offset=self.id_num_offset[chan],
+                                            id_num_offset=id_num_offset[chan],
                                             **gratinggrid))
         elements.extend([catsupport, catsupportbars, self.gratquality])
         super(CATGratings, self).__init__(elements=elements, **kwargs)
@@ -263,7 +262,7 @@ class Arcus(Sequence):
         '''Add four sided boom. Only the top two bays contribute any
         absorption, so we can save time by not modelling the remaining bays.'''
         return [boom.FourSidedBoom(orientation=xyz2zxy[:3, :3],
-                                   position=[conf['d'], 0, 546.],
+                                   position=[0, 0, 546.],
                                    boom_dimensions={'start_bay': 6})]
 
     def add_detectors(self, conf):
@@ -303,7 +302,7 @@ class ArcusForPlot(Arcus):
 
     def add_boom(self, conf):
         return [boom.FourSidedBoom(orientation=xyz2zxy[:3, :3],
-                                   position=[conf['d'], 0, 546.])]
+                                   position=[0, 0, 546.])]
 
     def add_detectors(self, conf):
         '''Add detectors to the element list

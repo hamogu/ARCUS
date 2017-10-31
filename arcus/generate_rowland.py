@@ -80,13 +80,13 @@ def make_rowland_from_d_BF_R_f(d_BF, R, f=11880.):
     d = 0.5 * d_BF
     r = 0.5 * np.sqrt(f**2 + d_BF**2)
     alpha = np.arctan2(d_BF, f)
-    pos = [(r + R) * np.sin(alpha) - d,
+    pos = [(r + R) * np.sin(alpha),
            0, f - (r + R) * np.cos(alpha)]
     orient = [[-np.sin(alpha), np.cos(alpha), 0],
               [0., 0., 1],
               [np.cos(alpha), np.sin(alpha), 0]]
 
-    posm = [(r + R) * np.sin(-alpha) - d,
+    posm = [(r + R) * np.sin(-alpha),
             0, f - (r + R) * np.cos(-alpha)]
 
     orientm = [[-np.sin(alpha), -np.cos(alpha), 0],
@@ -100,10 +100,10 @@ def make_rowland_from_d_BF_R_f(d_BF, R, f=11880.):
                                                 orientation=orient),
                 'rowland_central_m': RowlandTorus(R=R, r=r, position=posm,
                                                   orientation=orientm)}
-    geometry['pos_opt_ax'] = {'1': [-d, -7.5, 0., 1],
-                              '1m': [d, -2.5, 0, 1],
-                              '2': [-d, +2.5, 0, 1],
-                              '2m': [d, 7.5, 0, 1]}
+    geometry['pos_opt_ax'] = {'1': np.array([-d, -7.5, 0., 1]),
+                              '1m': np.array([d, -2.5, 0, 1]),
+                              '2': np.array([-d, +2.5, 0, 1]),
+                              '2m': np.array([d, 7.5, 0, 1])}
 
     # Now offset that Rowland torus in a z axis by a few mm.
     # Shift is measured from point on symmetry plane.
@@ -114,7 +114,7 @@ def make_rowland_from_d_BF_R_f(d_BF, R, f=11880.):
         if channel in ['1', '2']:
             base_rowland = 'rowland_central'
         elif channel in ['1m', '2m']:
-            base_rowland = 'rowland_centralm'
+            base_rowland = 'rowland_central_m'
         namer = 'rowland_' + channel
         geometry[namer] = RowlandTorus(R, r,
                                        pos4d=geometry[base_rowland].pos4d)

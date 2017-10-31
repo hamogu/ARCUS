@@ -5,7 +5,8 @@ import astropy.units as u
 from scipy.interpolate import interp1d
 
 from marxs.optics.aperture import RectangleAperture, MultiAperture
-from marxs.optics import PerfectLens, GlobalEnergyFilter
+from marxs.optics import (PerfectLens, GlobalEnergyFilter,
+                          RadialMirrorScatter)
 from marxs.simulator import Parallel
 from marxs.math.utils import e2h, h2e, norm_vector
 from marxs.math.polarization import parallel_transport
@@ -76,3 +77,27 @@ def get_reflectivityfilter():
     return GlobalEnergyFilter(filterfunc=interp1d(en, tab['reflectivity']**2),
                               name='double relectivity')
 doublereflectivity = get_reflectivityfilter()
+
+
+class ScatterPerChannel(RadialMirrorScatter):
+    '''A scatter of infinite size that identifies photons by spo id
+
+    This ignores the result of the intersection calcualtion and instead
+    just select photons for this scatter by spo id.
+
+    Parameters
+    ----------
+    min_id : integer
+        Photons with spo id between ``min_id`` and ``min_id + 1000`` are
+        scattered.
+    '''
+    display = {'shape': 'None'}
+
+    def __init__(self, **kwargs):
+        self.min_id = kwargs.pop('min_id')
+        super(ScatterPerChannel, self).__init__(**kwargs)
+
+    def specific_process_photons(self, photons, intersect, interpos, intercoos):
+        intersect = ((photons['spo'] > self.min_id) &
+                     (photons['spo'] < (self.min_id + 1000)))
+        return super(ScatterPerChannel, self).specific_process_photons(photons, intersect, None, None)
