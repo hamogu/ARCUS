@@ -104,6 +104,7 @@ def make_rowland_from_d_BF_R_f(d_BF, R, f=11880.):
                               '1m': np.array([d, -2.5, 0, 1]),
                               '2': np.array([-d, +2.5, 0, 1]),
                               '2m': np.array([d, 7.5, 0, 1])}
+    geometry['pos_det_rowland'] = np.array([-d, 0, 0, 1])
 
     # Now offset that Rowland torus in a z axis by a few mm.
     # Shift is measured from point on symmetry plane.
@@ -120,5 +121,13 @@ def make_rowland_from_d_BF_R_f(d_BF, R, f=11880.):
                                        pos4d=geometry[base_rowland].pos4d)
         geometry[namer].pos4d = np.dot(geometry[name],
                                        geometry[namer].pos4d)
+
+    geometry['shift_det_rowland'] = np.eye(4)
+    geometry['shift_det_rowland'][:, 3] = geometry['pos_det_rowland']
+    geometry['rowland_detector'] = RowlandTorus(R, r,
+                                                pos4d=geometry['rowland_central'].pos4d)
+    geometry['rowland_detector'].pos4d = np.dot(geometry['shift_det_rowland'],
+                                                geometry['rowland_detector'].pos4d)
+
 
     return geometry

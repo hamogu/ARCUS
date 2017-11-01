@@ -175,7 +175,7 @@ class DetMany(RowlandCircleArray):
     theta = [np.pi - 0.5, np.pi + 0.5]
 
     def __init__(self, conf, **kwargs):
-        super(DetMany, self).__init__(rowland=conf['rowland_central'],
+        super(DetMany, self).__init__(rowland=conf['rowland_detector'],
                                     elem_class=self.elem_class,
                                     elem_args=self.elem_args,
                                     d_element=self.d_element,
