@@ -1,4 +1,5 @@
 from copy import deepcopy
+import string
 import numpy as np
 import astropy.units as u
 from scipy.interpolate import interp1d
@@ -180,6 +181,8 @@ class DetMany(RowlandCircleArray):
                                     elem_args=self.elem_args,
                                     d_element=self.d_element,
                                     theta=self.theta)
+        for i, e in enumerate(self.elements):
+            e.name = 'CCD ' + string.ascii.uppercase[i]
 
 
 class Det16(DetMany):
@@ -248,8 +251,8 @@ class FocalPlaneDet(marxs.optics.FlatDetector):
         super(FocalPlaneDet, self).__init__(**kwargs)
 
 
-class Arcus(Sequence):
-
+class PerfectArcus(Sequence):
+    '''Default Definition of Arcus without any misalignments'''
     aper_class = Aperture
     spo_class = SimpleSPOs
     gratings_class = CATGratings
@@ -298,8 +301,15 @@ class Arcus(Sequence):
                                     **kwargs)
 
 
-class ArcusForPlot(Arcus):
+class Arcus(PerfectArcus):
 
+    pass
+
+class ArcusForPlot(PerfectArcus):
+    '''Arcus with setting that are good for 3D plots
+
+    In particular, there is a full boom and no large catch-all focal plane.
+    '''
     def add_boom(self, conf):
         return [boom.FourSidedBoom(orientation=xyz2zxy[:3, :3],
                                    position=[0, 0, 546.])]

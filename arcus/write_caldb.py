@@ -43,7 +43,7 @@ def focplane(tagversion={}):
         tab[c].unit = u.mm
 
     for e in det.elements:
-        row = {'CCDID': e.name.replace('CCD ', ''),
+        row = {'CCDID': e.name.replace('CCD', '').strip(),
                'XPIX': e.npix[0],
                'YPIX': e.npix[1],
                'XPXL': e.pixsize,
@@ -51,7 +51,7 @@ def focplane(tagversion={}):
                'XWIDTH': np.linalg.norm(h2e(e.geometry('v_y'))) * 2,
                'YWIDTH': np.linalg.norm(h2e(e.geometry('v_z'))) * 2,
                'FOC0': h2e(e.geometry('center') - e.geometry('v_y') - e.geometry('v_z')),
-               'FOCN': h2e(e.geometry('e_x')),
+               'FOCN': h2e(e.geometry('e_z')),
                'FOCX': h2e(e.geometry('e_x')),
                'READDIR': '+y',
         }
@@ -62,6 +62,7 @@ def focplane(tagversion={}):
     tab.meta['CALTYPE'] = 'FOCPLANE'
     tab.meta['VERSION'] = versionstring()
     tab.meta['INSTRUME'] = 'CCD'
-    tab.meta['filter'] = 'none'
+    tab.meta['FILTER'] = 'none'
+    tab.meta['EXTNAME'] = 'CALTYPE'
     tab = tagversion(tab)
     tab.write(pjoin(conf.caldb_inputdata, 'fits', 'focplane.fits'), overwrite=True)
