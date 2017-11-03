@@ -1,5 +1,4 @@
 from copy import deepcopy
-import string
 import numpy as np
 import astropy.units as u
 from scipy.interpolate import interp1d
@@ -86,7 +85,7 @@ class SimpleSPOs(Sequence):
                  inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
                  perpplanescatter=1.5 / 2.345 / 3600. / 180. * np.pi,
                  **kwargs):
-        rot180 = transforms3d.euler.euler2mat(np.pi, 0,0,'szyx')
+        rot180 = transforms3d.euler.euler2mat(np.pi, 0, 0, 'szyx')
         # Make lens a little larger than aperture, otherwise an non on-axis ray
         # (from pointing jitter or an off-axis source) might miss the mirror.
         mirror = []
@@ -172,24 +171,30 @@ class FiltersAndQE(Sequence):
 
 class DetMany(RowlandCircleArray):
     elem_class = FlatDetector
-    elem_args = {'pixsize': 0.024, 'zoom': [1, 24.576, 12.288]}
+    # orientation flips around CCDs so that det_x inscreases
+    # with increasing x coordinate
+    elem_args = {'pixsize': 0.024, 'zoom': [1, 24.696, 12.468],
+                 'orientation': np.array([[-1, 0, 0],
+                                          [0, -1, 0],
+                                          [0, 0, +1]])}
     d_element = elem_args['zoom'][1] * 2 + 0.5  # 500 mu gap between detectors
     theta = [np.pi - 0.5, np.pi + 0.5]
 
     def __init__(self, conf, **kwargs):
         super(DetMany, self).__init__(rowland=conf['rowland_detector'],
-                                    elem_class=self.elem_class,
-                                    elem_args=self.elem_args,
-                                    d_element=self.d_element,
-                                    theta=self.theta)
-        for i, e in enumerate(self.elements):
-            e.name = 'CCD ' + string.ascii_uppercase[i]
+                                      elem_class=self.elem_class,
+                                      elem_args=self.elem_args,
+                                      d_element=self.d_element,
+                                      theta=self.theta)
+        # reversed so numbering is with increasing x coordinate
+        for i, e in enumerate(reversed(self.elements)):
+            e.name = 'CCD ' + str(i + 1)
 
 
 class Det16(DetMany):
     '''Place only hand-selected 16 CCDs'''
-    def __init__(self, conf, theta=[3.1255, 3.1853, 3.2416, 3.301],  **kwargs):
-        self.theta=theta
+    def __init__(self, conf, theta=[3.1255, 3.1853, 3.2416, 3.301], **kwargs):
+        self.theta = theta
         super(Det16, self).__init__(conf, **kwargs)
         assert len(self.elements) == 16
         # but make real detectors orange
