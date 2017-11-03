@@ -100,7 +100,8 @@ class SimpleSPOs(Sequence):
             mirror.append(spo.ScatterPerChannel(position=entrancepos,
                                                 min_id=id_num_offset[chan],
                                                 inplanescatter=inplanescatter,
-                                                perpplanescatter=perpplanescatter))
+                                                perpplanescatter=perpplanescatter,
+                                                orientation=xyz2zxy[:3, :3]))
         mirror.append(spo.geometricthroughput)
         mirror.append(spo.doublereflectivity)
         mirror.append(spomounting)
@@ -182,7 +183,7 @@ class DetMany(RowlandCircleArray):
                                     d_element=self.d_element,
                                     theta=self.theta)
         for i, e in enumerate(self.elements):
-            e.name = 'CCD ' + string.ascii.uppercase[i]
+            e.name = 'CCD ' + string.ascii_uppercase[i]
 
 
 class Det16(DetMany):
