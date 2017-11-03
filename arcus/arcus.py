@@ -296,7 +296,7 @@ class PerfectArcus(Sequence):
         elem.extend(self.add_detectors(conf))
 
         elem.append(tagversion)
-        super(Arcus, self).__init__(elements=elem,
+        super(PerfectArcus, self).__init__(elements=elem,
                                     postprocess_steps=self.post_process(),
                                     **kwargs)
 
