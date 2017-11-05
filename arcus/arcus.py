@@ -282,7 +282,7 @@ class PerfectArcus(Sequence):
         function makes it easy to override for derived classes.
         '''
         twostrips = DetTwoStrips(conf)
-        proj = marxs.analysis.ProjectOntoPlane()
+        proj = marxs.analysis.ProjectOntoPlane(orientation=xyz2zxy[:3, :3])
         detfp = FocalPlaneDet()
         return [twostrips, proj, detfp]
 

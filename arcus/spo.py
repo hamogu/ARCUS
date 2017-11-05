@@ -82,8 +82,8 @@ doublereflectivity = get_reflectivityfilter()
 class ScatterPerChannel(RadialMirrorScatter):
     '''A scatter of infinite size that identifies photons by spo id
 
-    This ignores the result of the intersection calcualtion and instead
-    just select photons for this scatter by spo id.
+    This bypasses the intersection calculation and instead
+    just selects photons for this scatter by spo id.
 
     Parameters
     ----------
@@ -97,7 +97,11 @@ class ScatterPerChannel(RadialMirrorScatter):
         self.min_id = kwargs.pop('min_id')
         super(ScatterPerChannel, self).__init__(**kwargs)
 
-    def specific_process_photons(self, photons, intersect, interpos, intercoos):
+    def __call__(self, photons):
         intersect = ((photons['spo'] > self.min_id) &
                      (photons['spo'] < (self.min_id + 1000)))
-        return super(ScatterPerChannel, self).specific_process_photons(photons, intersect, None, None)
+        # interpos and intercoos is used to automatically set new position
+        # (which we want unaltered, thus we pass pos) and local coords
+        # (which we don't care about, thus we pass zeroth in the right shape.
+        return self.process_photons(photons, intersect, photons['pos'].data,
+                                    np.zeros((len(photons), 2)))

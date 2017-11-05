@@ -34,6 +34,10 @@ def test_orders_are_focussed(instrument):
             assert np.std(photons['det_y'][ind]) < 1
             assert np.std(photons['det_x'][ind]) < 1
             assert np.std(photons['det_x'][ind]) < np.std(photons['det_y'][ind])
+            # But make sure that are not focussed too much
+            # That would indicate that the scattering did not work
+            assert np.std(photons['det_x'][ind]) > .04
+            assert np.std(photons['det_y'][ind]) > .1
 
 
 def test_zeroth_order_and_some_dispersed_orders_are_seen():
