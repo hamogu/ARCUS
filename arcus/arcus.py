@@ -28,7 +28,7 @@ __all__ = ['xyz2zxy',
 
 jitter_sigma = load_number('other', 'pointingjitter',
                            'FWHM') / 2.3545
-defaultconf = make_rowland_from_d_BF_R_f(600., 5915.51307, 11876.4268)
+defaultconf = make_rowland_from_d_BF_R_f(600., 5915.51307, 12000. - 123.569239)
 defaultconf['blazeang'] = 1.8
 defaultconf['n_CCDs'] = 16
 defaultconf['phi_det_start'] = 0.04297
