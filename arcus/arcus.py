@@ -171,13 +171,13 @@ class FiltersAndQE(Sequence):
 
 class DetMany(RowlandCircleArray):
     elem_class = FlatDetector
-    # orientation flips around CCDs so that det_x inscreases
+    # orientation flips around CCDs so that det_x increases
     # with increasing x coordinate
     elem_args = {'pixsize': 0.024, 'zoom': [1, 24.696, 12.468],
                  'orientation': np.array([[-1, 0, 0],
                                           [0, -1, 0],
                                           [0, 0, +1]])}
-    d_element = elem_args['zoom'][1] * 2 + 0.5  # 500 mu gap between detectors
+    d_element = elem_args['zoom'][1] * 2 + 0.824 * 2
     theta = [np.pi - 0.5, np.pi + 0.5]
 
     def __init__(self, conf, **kwargs):
@@ -303,13 +303,13 @@ class PerfectArcus(Sequence):
 
         elem.append(tagversion)
         super(PerfectArcus, self).__init__(elements=elem,
-                                    postprocess_steps=self.post_process(),
-                                    **kwargs)
+                                           postprocess_steps=self.post_process(),
+                                           **kwargs)
 
 
 class Arcus(PerfectArcus):
-
     pass
+
 
 class ArcusForPlot(PerfectArcus):
     '''Arcus with setting that are good for 3D plots
