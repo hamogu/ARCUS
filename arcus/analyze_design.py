@@ -90,7 +90,7 @@ def calc_resolution(p, orders):
     Returns
     -------
     resolvingpower : np.array of shape (N,)
-        Resolving power averages of all dispersed orders
+        Resolving power averages over all dispersed orders
     res_out : np.array of shape (M, N)
         Resolving power per order
     prob_out : np.array of shape (M, N)
@@ -156,7 +156,7 @@ def make_det_scenarios(p):
                           'phi_stop': phistart + angle_covered_by_CCDs(p),
                           'scenario_name': 'G1-1 (a/b)'})
 
-    # Scenario 4: Maximize
+    # Scenario 4: Maximize band 33-40 Ang
     po7 = pdisp[between(pdisp['wave'], [33.7, 40.01])]
     phistart = ccd8zeroorder(po7)
     det_scenarios.append({'phi_start': phistart,
