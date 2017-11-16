@@ -173,11 +173,11 @@ class DetMany(RowlandCircleArray):
     elem_class = FlatDetector
     # orientation flips around CCDs so that det_x increases
     # with increasing x coordinate
-    elem_args = {'pixsize': 0.024, 'zoom': [1, 24.696, 12.468],
+    elem_args = {'pixsize': 0.024, 'zoom': [1, 24.576, 12.288],
                  'orientation': np.array([[-1, 0, 0],
                                           [0, -1, 0],
                                           [0, 0, +1]])}
-    d_element = elem_args['zoom'][1] * 2 + 0.824 * 2
+    d_element = elem_args['zoom'][1] * 2 + 0.824 * 2 + 0.5
     theta = [np.pi - 0.5, np.pi + 0.5]
 
     def __init__(self, conf, **kwargs):
