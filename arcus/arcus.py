@@ -82,7 +82,7 @@ def spomounting(photons):
 class SimpleSPOs(Sequence):
 
     def __init__(self, conf, channels=['1', '2', '1m', '2m'],
-                 inplanescatter=10. / 2.3545 / 3600 / 180. * np.pi,
+                 inplanescatter=17.4 / 2.3545 / 3600 / 180. * np.pi,
                  perpplanescatter=1.5 / 2.345 / 3600. / 180. * np.pi,
                  **kwargs):
         rot180 = transforms3d.euler.euler2mat(np.pi, 0, 0, 'szyx')
