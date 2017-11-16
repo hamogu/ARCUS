@@ -44,8 +44,9 @@ id_num_offset = {'1': 0,
 fac = 1.5
 spopos = np.array(spo.spo_pos4d)
 rmid = 0.5 * (spopos[:, 2, 3].max() + spopos[:, 2, 3].min())
-rdim = spopos[:, 2, 3].max() - rmid + fac * spo.spogeom['depth'].max()
-aperzoom = [1, spopos[:, 1, 3].max() + fac * spo.spogeom['width'].max(),
+delta_r = spo.spogeom['outer_radius'] - spo.spogeom['inner_radius']
+rdim = spopos[:, 2, 3].max() - rmid + fac * delta_r.max()
+aperzoom = [1, spopos[:, 1, 3].max() + fac * spo.spogeom['azwidth'].max(),
             rdim]
 
 
@@ -75,7 +76,7 @@ class Aperture(optics.MultiAperture):
 def spomounting(photons):
     '''Remove photons that do not go through an SPO but hit the
     frame part of the petal.'''
-    photons['probability'][photons['spo'] < 0] = 0.
+    photons['probability'][photons['xou'] < 0] = 0.
     return photons
 
 

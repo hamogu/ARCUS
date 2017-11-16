@@ -20,16 +20,20 @@ focallength = 12000.
 
 
 spogeom = load_table('spos', 'petallayout')
+spogeom['r_mid'] = (spogeom['outer_radius'] + spogeom['inner_radius']) / 2
 spo_pos4d = []
 # Convert angle to quantity here to make sure that unit is taken into account
-for row, ang in zip(spogeom, u.Quantity(spogeom['angle']).to(u.rad).value):
+for row, ang in zip(spogeom, u.Quantity(spogeom['clocking_angle']).to(u.rad).value):
     spo_pos4d.append(compose([0,  # focallength,  # - spogeom[i]['d_from_12m']
                               row['r_mid'] * np.sin(ang),
                               row['r_mid'] * np.cos(ang)],
                              euler2mat(-ang, 0., 0.),
-                             [row['height'] / 2.,
-                              row['width'] / 2.,
-                              row['depth'] / 2.]))
+                             # In detail this should be (primary_length + gap + secondary_length) / 2
+                             # but the gap is somewhat complicated and this is only used
+                             # for display, we'll ignore that for now.
+                             [row['primary_length'],
+                              row['azwidth'] / 2.,
+                              (row['outer_radius'] - row['inner_radius']) / 2.]))
 
 
 class PerfectLensSegment(PerfectLens):
@@ -53,8 +57,8 @@ class SPOChannelMirror(Parallel):
         kwargs['elem_pos'] = spo_pos4d
         kwargs['elem_class'] = PerfectLensSegment
         kwargs['elem_args'] = {'d_center_optical_axis': list(spogeom['r_mid']),
-                               'focallength': focallength}
-        kwargs['id_col'] = 'spo'
+                               'focallength': list(spogeom['focal_length'])}
+        kwargs['id_col'] = 'xou'
         super(SPOChannelMirror, self).__init__(**kwargs)
 
 
@@ -98,8 +102,8 @@ class ScatterPerChannel(RadialMirrorScatter):
         super(ScatterPerChannel, self).__init__(**kwargs)
 
     def __call__(self, photons):
-        intersect = ((photons['spo'] > self.min_id) &
-                     (photons['spo'] < (self.min_id + 1000)))
+        intersect = ((photons['xou'] >= self.min_id) &
+                     (photons['xou'] < (self.min_id + 1000)))
         # interpos and intercoos is used to automatically set new position
         # (which we want unaltered, thus we pass pos) and local coords
         # (which we don't care about, thus we pass zeroth in the right shape.
