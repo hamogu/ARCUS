@@ -5,8 +5,9 @@ from marxs.base import SimulationSequenceElement
 from marxs.optics import GlobalEnergyFilter
 from marxs.optics.base import OpticalElement
 from marxs.simulator import ParallelCalculated
+from warnings import warn
 
-from .load_csv import load_table2d, load_number
+from .load_csv import load_table2d, load_number, load_table
 
 
 class InterpolateRalfTable(object):
@@ -124,6 +125,7 @@ def catsupportbars(photons):
 catsupport = GlobalEnergyFilter(filterfunc=lambda e: load_number('gratings', 'L1support', 'transmission') *
                                 load_number('gratings', 'L2support', 'transmission'))
 
+
 class RectangularGrid(ParallelCalculated, OpticalElement):
     '''A collection of diffraction gratings on the Rowland torus.
 
@@ -190,3 +192,49 @@ class RectangularGrid(ParallelCalculated, OpticalElement):
             zpos.append(self.rowland.solve_quartic(x=x, y=y, interval=self.z_range))
 
         return np.vstack([xpos.flatten(), ypos.flatten(), np.array(zpos), np.ones_like(zpos)]).T
+
+
+class CATfromMechanical(ParallelCalculated, OpticalElement):
+    '''A collection of diffraction gratings on the Rowland torus.
+
+    After any of the `elem_pos`, `elem_uncertainty` or
+    `uncertainty` is changed, `generate_elements` needs to be
+    called to regenerate the facets on the GAS.
+
+    Parameters
+    ----------
+    rowland : RowlandTorus
+    z_range: list of 2 floats
+        Minimum and maximum of the x coordinate that is searched for an
+        intersection with the torus. A ray can intersect a torus in up to four
+        points. ``x_range`` specififes the range for the numerical search for
+        the intersection point.
+    '''
+
+    id_col = 'facet'
+
+    def __init__(self, **kwargs):
+        self.data = load_table('gratings', 'facets')
+        self.z_range = kwargs.pop('z_range')
+        self.rowland = kwargs.pop('rowland')
+        kwargs['pos_spec'] = self.elempos
+        if 'parallel_spec' not in kwargs.keys():
+            kwargs['parallel_spec'] = np.array([0., 0., 1., 0.])
+
+        kwargs['elem_args']['d'] = list(self.data['period'])
+
+        kwargs['elem_args']['zoom'] = [[1, row['xsize'] / 2, row['ysize'] / 2] for row in self.data]
+        super(CATfromMechanical, self).__init__(**kwargs)
+        if np.allclose(self.pos4d, np.eye(4)):
+            warn('Position is (0,0,0). Unlike RectangularGrid, this class should have the position set to the focal point for each channel.')
+
+    def elempos(self):
+
+        zpos = []
+        for x, y in zip(self.data['X'].data, self.data['Y'].data):
+            zpos.append(self.rowland.solve_quartic(x=x, y=y, interval=self.z_range))
+
+        return np.vstack([self.data['X'].data,
+                          self.data['Y'].data,
+                          np.array(zpos),
+                          np.ones_like(zpos)]).T
