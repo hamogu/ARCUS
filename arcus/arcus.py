@@ -186,29 +186,52 @@ class Det16(DetMany):
             e.display = disp
 
 
-class DetTwoStrips(DetMany):
-    offset_strip = 0.1
-    'Offset for one strip to make chip gaps different in CCD lengths'
+class DetCamera(DetMany):
+    '''CCD detectors in camera layout
+
+    8 CCDs in each strip, with gaps between them in 3-2-3 groups
+    to match the shadows from the filter support.
+    One strip is offset by a few mm so that the chip gaps fall
+    into slightly different positions.
+    '''
+    d_fsupport = 4.
+    '''Distance between CCDs under a filter support bar in mm'''
+
+    d_ccd = 2.15
+    '''Minimal distance between CCDs in mm'''
+
+    offset = 5.
+    '''offset of one strip vs the other to avoid matching chip gaps in mm'''
 
     def __init__(self, conf, **kwargs):
         r = conf['rowland_central'].r
         phi_m = np.arcsin(conf['d'] / r) + np.pi
-        angle_strip = conf['n_CCDs'] / 2 * self.d_element / r
+        ccd = self.elem_args['zoom'][1]
         p0 = conf['phi_det_start']
-        offset = self.offset_strip * self.d_element / r
-        # +- 1e4 at the boundaries, otherwise rounding error can already
-        # and an entire extra CCD
-        self.theta = [phi_m - p0 - angle_strip + 1e-4,
-                      phi_m - p0,
-                      phi_m + p0 + offset,
-                      phi_m + p0 + angle_strip + offset - 1e-4]
-        super(DetTwoStrips, self).__init__(conf, **kwargs)
+        gaps = np.array([0, self.d_ccd, self.d_ccd, self.d_fsupport,
+                         self.d_ccd, self.d_fsupport,
+                         self.d_ccd, self.d_ccd])
+        theta1 = (p0 + ccd / r) + np.arange(8) * 2 * ccd / r + gaps.cumsum() / r
+        self.theta = np.hstack([phi_m - theta1,
+                                phi_m + self.offset / r + theta1])
+
+        super(DetCamera, self).__init__(conf, **kwargs)
         assert len(self.elements) == conf['n_CCDs']
         # but make real detectors orange
         disp = deepcopy(self.elements[0].display)
         disp['color'] = 'orange'
         for e in self.elements:
             e.display = disp
+
+    def distribute_elements_on_arc(self):
+        '''Distributes elements as evenly as possible along an arc segment.
+
+        Returns
+        -------
+        theta : np.ndarray
+            Theta coordinates of the element *center* positions.
+        '''
+        return self.theta
 
 
 class CircularDetector(marxs.optics.CircularDetector):
@@ -263,7 +286,7 @@ class PerfectArcus(Sequence):
         detectors need different parameters. Placing this specific code in it's own
         function makes it easy to override for derived classes.
         '''
-        twostrips = DetTwoStrips(conf)
+        twostrips = DetCamera(conf)
         proj = marxs.analysis.ProjectOntoPlane(orientation=xyz2zxy[:3, :3])
         detfp = FocalPlaneDet()
         return [twostrips, proj, detfp]
