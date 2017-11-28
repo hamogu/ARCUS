@@ -1,10 +1,11 @@
 import numpy as np
 import astropy.units as u
 from scipy.interpolate import RectBivariateSpline
+import transforms3d
 from marxs.base import SimulationSequenceElement
 from marxs.optics import GlobalEnergyFilter
 from marxs.optics.base import OpticalElement
-from marxs.simulator import ParallelCalculated
+from marxs.simulator import ParallelCalculated, Parallel
 from warnings import warn
 
 from .load_csv import load_table2d, load_number, load_table
@@ -194,47 +195,54 @@ class RectangularGrid(ParallelCalculated, OpticalElement):
         return np.vstack([xpos.flatten(), ypos.flatten(), np.array(zpos), np.ones_like(zpos)]).T
 
 
-class CATfromMechanical(ParallelCalculated, OpticalElement):
+class CATfromMechanical(Parallel):
     '''A collection of diffraction gratings on the Rowland torus.
 
     After any of the `elem_pos`, `elem_uncertainty` or
     `uncertainty` is changed, `generate_elements` needs to be
     called to regenerate the facets on the GAS.
-
-    Parameters
-    ----------
-    rowland : RowlandTorus
-    z_range: list of 2 floats
-        Minimum and maximum of the x coordinate that is searched for an
-        intersection with the torus. A ray can intersect a torus in up to four
-        points. ``x_range`` specififes the range for the numerical search for
-        the intersection point.
     '''
 
     id_col = 'facet'
 
+    def stack(self, name):
+        return np.vstack([self.data[name + 'X'].data,
+                          self.data[name + 'Y'].data,
+                          self.data[name + 'Z'].data]).T
+
     def __init__(self, **kwargs):
+        self.channel = kwargs.pop('channel')
+        self.conf = kwargs.pop('conf')
         self.data = load_table('gratings', 'facets')
-        self.z_range = kwargs.pop('z_range')
-        self.rowland = kwargs.pop('rowland')
-        kwargs['pos_spec'] = self.elempos
-        if 'parallel_spec' not in kwargs.keys():
-            kwargs['parallel_spec'] = np.array([0., 0., 1., 0.])
 
+        zoom = [[1, row['xsize'] / 2, row['ysize'] / 2] for row in self.data]
+        trans = self.stack('')
+        rot = np.stack([self.stack('NormN'),
+                        self.stack('DispN'),
+                        self.stack('GBarN')])
+        pos4d = [transforms3d.affines.compose(trans[i, :],
+                                              rot[:, i, :].T,
+                                              zoom[i])
+                 for i in range(len(self.data))]
+
+        # channels are all mirrors of each other
+        # 1, 0
+        # 0, 2 -> half show up at z = -10000
+        # MMmm, irgendwo ist heir der Worm drin.
+        # Die Aeffs sehen so aus als ob ein grosser Teil des Signals
+        # den detector nicht trifft.
+        mirr = np.eye(4)
+        if 'm' in self.channel:
+            mirr[0, 0] = 1
+        else:
+            mirr[0, 0] = -1
+        if '2' in self.channel:
+            mirr[1, 1] = -1
+
+        pos4d = [np.dot(mirr, p) for p in pos4d]
         kwargs['elem_args']['d'] = list(self.data['period'])
-
-        kwargs['elem_args']['zoom'] = [[1, row['xsize'] / 2, row['ysize'] / 2] for row in self.data]
+        kwargs['elem_pos'] = pos4d
         super(CATfromMechanical, self).__init__(**kwargs)
-        if np.allclose(self.pos4d, np.eye(4)):
-            warn('Position is (0,0,0). Unlike RectangularGrid, this class should have the position set to the focal point for each channel.')
 
-    def elempos(self):
-
-        zpos = []
-        for x, y in zip(self.data['X'].data, self.data['Y'].data):
-            zpos.append(self.rowland.solve_quartic(x=x, y=y, interval=self.z_range))
-
-        return np.vstack([self.data['X'].data,
-                          self.data['Y'].data,
-                          np.array(zpos),
-                          np.ones_like(zpos)]).T
+        for i, e in enumerate(self.elements):
+            e.SPO_MM_num = self.data['SPO_MM_num'][i]

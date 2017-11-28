@@ -67,8 +67,10 @@ def test_two_optical_axes():
 
 @pytest.mark.parametrize("instrum, expected_area",
                          [(Arcus(), 400 * u.cm**2),
-                          (Arcus(channels=['1', '2']), 200 * u.cm**2),
-                          (Arcus(channels=['1m', '2m']), 200 * u.cm**2)])
+                          (Arcus(channels=['1']), 100 * u.cm**2),
+                          (Arcus(channels=['2']), 100 * u.cm**2),
+                          (Arcus(channels=['1m']), 100 * u.cm**2),
+                          (Arcus(channels=['2m']), 100 * u.cm**2)])
 def test_effective_area(instrum, expected_area):
     '''Surely, the effective area of Arcus will eveolve a little when the code is
     changed to accomendate e.g. a slightly different mounting for the gratings,

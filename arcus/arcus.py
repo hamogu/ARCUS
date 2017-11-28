@@ -14,7 +14,7 @@ import marxs.analysis
 
 from .ralfgrating import (InterpolateRalfTable, RalfQualityFactor,
                           catsupportbars, catsupport,
-                          RectangularGrid)
+                          CATfromMechanical)
 from . import spo
 from . import boom
 from .load_csv import load_number, load_table
@@ -120,33 +120,14 @@ class CATGratings(Sequence):
 
         self.order_selector = self.order_selector_class()
         self.gratquality = self.gratquality_class()
-        blazemat = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]),
-                                                          np.deg2rad(-conf['blazeang']))
-        blazematm = transforms3d.axangles.axangle2mat(np.array([0, 0, 1]),
-                                                           np.deg2rad(conf['blazeang']))
-
-        gratinggrid = {'d_element': 32., 'z_range': [1e4, 1.4e4],
-                       'elem_class': CATGrating,
-                       'elem_args': {'d': 2e-4, 'zoom': [1., 13.5, 13.],
-                                     'orientation': blazemat,
-                                     'order_selector': self.order_selector},
-                       'parallel_spec': np.array([1., 0., 0., 0.])
+        gratinggrid = {'elem_class': CATGrating,
+                       'elem_args': {'order_selector': self.order_selector},
                        }
         for chan in channels:
-            gratinggrid['rowland'] = conf['rowland_' + chan]
-            b = blazematm if 'm' in chan else blazemat
-            gratinggrid['elem_args']['orientation'] = b
-            gratinggrid['normal_spec'] = conf['pos_opt_ax'][chan].copy()
-            xm, ym = conf['pos_opt_ax'][chan][:2].copy()
-            sig = 1 if '1' in chan else -1
-            x_range = [-self.grid_width_x + xm,
-                       +self.grid_width_x + xm]
-            y_range = [sig * (600 - ym - self.grid_width_y),
-                       sig * (600 - ym + self.grid_width_y)]
-            y_range.sort()
-            elements.append(RectangularGrid(x_range=x_range, y_range=y_range,
-                                            id_num_offset=id_num_offset[chan],
-                                            **gratinggrid))
+            elements.append(CATfromMechanical(pos4d=conf['shift_optical_axis_' + chan],
+                                              channel=chan, conf=conf,
+                                              id_num_offset=id_num_offset[chan],
+                                              **gratinggrid))
         elements.extend([catsupport, catsupportbars, self.gratquality])
         super(CATGratings, self).__init__(elements=elements, **kwargs)
 
