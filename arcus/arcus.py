@@ -208,7 +208,7 @@ class DetCamera(DetMany):
         phi_m = np.arcsin(conf['d'] / r) + np.pi
         ccd = self.elem_args['zoom'][1]
         p0 = conf['phi_det_start']
-        gaps = np.array([0, self.d_ccd, self.d_ccd, self.d_fsupport,
+        gaps = np.array([0, self.d_ccd, self.d_fsupport, self.d_ccd,
                          self.d_ccd, self.d_fsupport,
                          self.d_ccd, self.d_ccd])
         theta1 = (p0 + ccd / r) + np.arange(8) * 2 * ccd / r + gaps.cumsum() / r
