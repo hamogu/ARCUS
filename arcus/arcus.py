@@ -214,6 +214,9 @@ class DetCamera(DetMany):
         theta1 = (p0 + ccd / r) + np.arange(8) * 2 * ccd / r + gaps.cumsum() / r
         self.theta = np.hstack([phi_m - theta1,
                                 phi_m + self.offset / r + theta1])
+        # Sort so that CCD number increases from -x to +x
+        self.theta.sort()
+        self.theta = self.theta[::-1]
 
         super(DetCamera, self).__init__(conf, **kwargs)
         assert len(self.elements) == conf['n_CCDs']
