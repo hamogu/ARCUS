@@ -167,10 +167,10 @@ class DetMany(RowlandCircleArray):
                                       elem_class=self.elem_class,
                                       elem_args=self.elem_args,
                                       d_element=self.d_element,
-                                      theta=self.theta)
-        # reversed so numbering is with increasing x coordinate
-        for i, e in enumerate(reversed(self.elements)):
-            e.name = 'CCD ' + str(i + 1)
+                                      theta=self.theta,
+                                      # convention is to start counting at 1
+                                      id_num_offset=1,
+                                      id_col='CCD')
 
 
 class Det16(DetMany):

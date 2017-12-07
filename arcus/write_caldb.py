@@ -6,7 +6,7 @@ import numpy as np
 from astropy.table import Table
 import astropy.units as u
 from marxs.math.utils import h2e
-from .arcus import DetTwoStrips, defaultconf
+from .arcus import DetCamera, defaultconf
 from .utils import TagVersion
 from . import conf
 
@@ -30,7 +30,7 @@ def focplane(tagversion={}):
     >>> focplane(tagversion={'creator': 'Guenther', 'origin': 'MIT'})
     '''
     tagversion = TagVersion(**tagversion)
-    det = DetTwoStrips(defaultconf)
+    det = DetCamera(defaultconf)
 
     tab = Table(names=['CCDID', 'XPIX', 'YPIX', 'XPXL', 'YPXL', 'XWIDTH', 'YWIDTH',
                        'FOC0', 'FOCN', 'FOCX', 'READDIR'],
@@ -43,7 +43,7 @@ def focplane(tagversion={}):
         tab[c].unit = u.mm
 
     for e in det.elements:
-        row = {'CCDID': int(e.name.replace('CCD', '').strip()),
+        row = {'CCDID': e.id_num,
                'XPIX': e.npix[0],
                'YPIX': e.npix[1],
                'XPXL': e.pixsize,
