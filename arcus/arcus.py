@@ -31,7 +31,7 @@ jitter_sigma = load_number('other', 'pointingjitter',
 defaultconf = make_rowland_from_d_BF_R_f(600., 5915.51307, 12000. - 123.569239)
 defaultconf['blazeang'] = 1.8
 defaultconf['n_CCDs'] = 16
-defaultconf['phi_det_start'] = 0.04297
+defaultconf['phi_det_start'] = 0.037
 
 id_num_offset = {'1': 0,
                  '2': 1000,
