@@ -24,10 +24,32 @@ def singletolerance(photons_in, instrum_before,
 
 
 class ParallelUncertainty(object):
+    '''Apply uncertainties to `marxs.simulator.Parallel` objects.
+
+    '''
     def __init__(self, elements):
         self.elements = elements
 
     def find_parallel(self, obj):
+        '''Walk a hirachy of simulation elements to find `Parallel` elements.
+
+        This walk down a hiracy of `marxs.simulator.Sequence` and
+        `marxs.simulator.Parallel` objects to find the first level
+        that contains an object derived from the `marxs.simulator.Parallel`
+        class.
+
+        Parameters
+        ----------
+        obj : Marxs simulation object
+            The object to start a search (typically a `marxs.simulator.Sequence`
+            object.)
+
+        Returns
+        -------
+        out : list
+            Python list of all `marxs.simulator.Parallel` objects in the level
+            where the first `marxs.simulator.Parallel` was found.
+        '''
         if isinstance(obj, Parallel):
             return [obj]
         elif hasattr(obj, 'elements'):
@@ -47,6 +69,13 @@ class ParallelUncertainty(object):
         # of this object
         return self.find_parallel(self.elements)
 
+    def apply_uncertainty(self, e, parameters):
+        '''Apply uncertainties to a `marxs.simulator.Parallel`.
+
+        This method needs to be implemented by a derived class.
+        '''
+        raise NotImplementedError
+
     def __call__(self, parameters):
         for e in self.parallels:
             self.apply_uncertainty(e, parameters)
@@ -55,13 +84,17 @@ class ParallelUncertainty(object):
 
 
 class WiggleIndividualElements(ParallelUncertainty):
-
+    '''Wiggle elements of a Parallel object individually,
+    drawing their misplacement from a Gaussian distribution with the
+    parameters given.
+    '''
     def apply_uncertainty(self, e, parameters):
         e.elem_uncertainty = genfacun(len(e.elements), tuple(parameters[:3]),
                                       tuple(parameters[3:]))
 
 
 class WiggleGlobalParallel(ParallelUncertainty):
+    '''Move all elements of a Parallel object in the same way.'''
     def apply_uncertainty(self, e, parameters):
         e.uncertainty = affines.compose(parameters[:3],
                                         euler.euler2mat(parameters[3],
@@ -71,7 +104,21 @@ class WiggleGlobalParallel(ParallelUncertainty):
 
 
 class CaptureResAeff(object):
+    '''Capture resolving power and effective area for a tolerancing simulation.
 
+    Instances of this class can be called with a list of input parameters for
+    a toleracning simulation and a resulting photon list. The photon list
+    will be analysed for resolving power and effective area in a number of
+    relevant orders.
+    Every instance of this object has a ``tab`` attribute and every time the
+    instance is called it wadd one row of data to the table.
+
+    Parameters
+    ----------
+    A_geom : number
+        Geometric area of aperture for the simulations that this instance
+        will analyse.
+    '''
     orders = np.arange(-10, 1)
 
     order_col = 'order'

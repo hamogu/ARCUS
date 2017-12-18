@@ -225,12 +225,6 @@ class CATfromMechanical(Parallel):
                                               zoom[i])
                  for i in range(len(self.data))]
 
-        # channels are all mirrors of each other
-        # 1, 0
-        # 0, 2 -> half show up at z = -10000
-        # MMmm, irgendwo ist heir der Worm drin.
-        # Die Aeffs sehen so aus als ob ein grosser Teil des Signals
-        # den detector nicht trifft.
         mirr = np.eye(4)
         if 'm' in self.channel:
             mirr[0, 0] = 1
