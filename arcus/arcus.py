@@ -310,7 +310,9 @@ class PerfectArcus(Sequence):
 
 
 class Arcus(PerfectArcus):
-    pass
+    def __init__(self, **kwargs):
+        super(Arcus, self).__init__(**kwargs)
+
 
 
 class ArcusForPlot(PerfectArcus):
