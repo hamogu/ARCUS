@@ -7,7 +7,7 @@ import transforms3d
 import marxs
 from marxs.simulator import Sequence, KeepCol
 from marxs.optics import (GlobalEnergyFilter,
-                          FlatDetector, CATGrating)
+                          FlatDetector)
 from marxs import optics
 from marxs.design.rowland import RowlandCircleArray
 import marxs.analysis
@@ -111,23 +111,17 @@ class SimpleSPOs(Sequence):
 class CATGratings(Sequence):
     order_selector_class = InterpolateRalfTable
     gratquality_class = RalfQualityFactor
-    grid_width_x = 200
-    grid_width_y = 300
 
     def __init__(self, conf, channels=['1', '2', '1m', '2m'], **kwargs):
 
         elements = []
 
-        self.order_selector = self.order_selector_class()
         self.gratquality = self.gratquality_class()
-        gratinggrid = {'elem_class': CATGrating,
-                       'elem_args': {'order_selector': self.order_selector},
-                       }
         for chan in channels:
             elements.append(CATfromMechanical(pos4d=conf['shift_optical_axis_' + chan],
                                               channel=chan, conf=conf,
                                               id_num_offset=id_num_offset[chan],
-                                              **gratinggrid))
+                                              ))
         elements.extend([catsupport, catsupportbars, self.gratquality])
         super(CATGratings, self).__init__(elements=elements, **kwargs)
 
