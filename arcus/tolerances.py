@@ -20,15 +20,37 @@ def singletolerance(photons_in, instrum_before,
         instrum = wigglefunc(pars)
         p_out = instrum(photons.copy())
         p_out = instrum_after(p_out)
-        derive_result(pars, p_out)
+        ind = np.isfinite(p_out['det_x']) & (p_out['probability'] > 0)
+        derive_result(pars, p_out[ind], len(p_out))
 
 
 class ParallelUncertainty(object):
-    '''Apply uncertainties to `marxs.simulator.Parallel` objects.
+    '''Apply uncertainties to `~marxs.simulator.Parallel` objects.
+
+    This class is initialized with a Marxs simulation object
+    (typically a `~marxs.simulator.Sequence`). When it is called,
+    it applies specific misplacements to the elements of a
+     `~marxs.simulator.Parallel` group. This class will descend through
+    the object hierarchy of the input to find all matching
+     `~marxs.simulator.Parallel` objects.
+
+    Parameters
+    ----------
+    elements :  Marxs simulation object
+        The object to start a search (typically a `marxs.simulator.Sequence`
+        object.)
+    parallel_class : class or None
+        If this is ``None``, this will simply step though the levels of
+        `~marxs.simulator.Sequence` objects until it finds any
+        `~marxs.simulator.Parallel` object and then apply tolerances to
+        all `~marxs.simulator.Parallel` objects on that level. If a class
+        is given, instead tolerances will be applied to all instances
+        of that class (not subclasses).
 
     '''
-    def __init__(self, elements):
+    def __init__(self, elements, parallel_class=None):
         self.elements = elements
+        self.parallel_class = parallel_class
 
     def find_parallel(self, obj):
         '''Walk a hirachy of simulation elements to find `Parallel` elements.
@@ -60,6 +82,16 @@ class ParallelUncertainty(object):
         else:
             return []
 
+    def find_parallel_class(self, obj, cla):
+        a = []
+        if hasattr(obj, 'elements'):
+            for e in obj.elements:
+                a += self.find_parallel_class(e, cla)
+
+        if type(obj) == cla:
+            a += [obj]
+        return a
+
     @property
     def parallels(self):
         # Yes, the self in this call is necessary and python will expand
@@ -67,7 +99,10 @@ class ParallelUncertainty(object):
         # This works, because find_parallel needs the first self (to call the
         # method recursively and the second self to look at the elements
         # of this object
-        return self.find_parallel(self.elements)
+        if self.parallel_class is None:
+            return self.find_parallel(self.elements)
+        else:
+            return self.find_parallel_class(self.elements, self.parallel_class)
 
     def apply_uncertainty(self, e, parameters):
         '''Apply uncertainties to a `marxs.simulator.Parallel`.
@@ -103,11 +138,32 @@ class WiggleGlobalParallel(ParallelUncertainty):
                                         np.ones(3))
 
 
+class PeriodVariation(ParallelUncertainty):
+    '''Randomly draw different grating periods for different gratings
+
+    This class needs to be instantiated with the gratings, e.g.
+
+    >>> dvar = PeriodVariation(elements, class=CATGratings)
+
+    and the parameters are expected to have two components:
+    center and sigma of a Gaussian distribution for grating contstant d.
+    '''
+    def apply_uncertainty(self, e, parameters):
+        if not hasattr(e, '_d'):
+            raise ValueError('Object {} does not have grating period `_d` attribute.'.format(e))
+        e._d = np.random.normal(parameters[0], parameters[1])
+
+    def __call__(self, parameters):
+        for e in self.parallels:
+            self.apply_uncertainty(e, parameters)
+        return self.elements
+
+
 class CaptureResAeff(object):
     '''Capture resolving power and effective area for a tolerancing simulation.
 
     Instances of this class can be called with a list of input parameters for
-    a toleracning simulation and a resulting photon list. The photon list
+    a tolerancing simulation and a resulting photon list. The photon list
     will be analysed for resolving power and effective area in a number of
     relevant orders.
     Every instance of this object has a ``tab`` attribute and every time the
@@ -115,9 +171,17 @@ class CaptureResAeff(object):
 
     Parameters
     ----------
+    n_parameters : int
+        Parameters will be stored in a vector-valued column called
+        "Parameters". To generate this column in the correct size,
+        ``n_parameters`` specifies the number of parameters.
     A_geom : number
         Geometric area of aperture for the simulations that this instance
-        will analyse.
+        will analyze.
+    on_detector_test : callable
+        A function that can be called on a photon table and returns a
+        boolean array with elements set to ``True`` for photons that hit
+        the detector. (In order to calcu
     '''
     orders = np.arange(-10, 1)
 
@@ -128,11 +192,12 @@ class CaptureResAeff(object):
     '''Dispersion coordinate for
     `marxs.analysis.gratings.resolvingpower_from_photonlist`'''
 
-    def __init__(self, Ageom=1):
+    def __init__(self, n_parameters, Ageom=1):
         self.Ageom = Ageom
         form = '{}f4'.format(len(self.orders))
         self.tab = Table(names=['Parameters', 'Aeff0', 'Aeffgrat', 'Rgrat', 'Aeff', 'R'],
-                         dtype=['6f4', float, float, float, form, form]
+                         dtype=['{}f4'.format(n_parameters),
+                                float, float, float, form, form]
                          )
         for c in ['Aeff', 'Aeffgrat', 'Aeff']:
             self.tab[c].unit = Ageom.unit
@@ -158,29 +223,26 @@ class CaptureResAeff(object):
         '''
         return len(photons)
 
-    def filter_photon_list(self, photons):
-        '''Filter photon list to detected photons
+    def calc_result(self, filtered, n_photons):
+        '''Calculate Aeff and R for an input photon list.
 
         Parameters
         ----------
         photons : `astropy.table.Table`
-            Photon list
+            Photon list. This photon list should already be filtered
+            and contain only "good" photons, i.e. photons that hit a
+            detector and have a non-zero probability.
+        n_photons : number
+            In order to calculate the effective area, the function needs
+            to calculate the fraction of detected photons and to do that
+            the total number of simulated photons needs to be passed in.
 
         Returns
         -------
-        filtered : `astropy.table.Table`
-            Photon list
+        result : dict
+            Dictionary with per-order Aeff and R, as well as values
+            summed over all grating orders.
         '''
-        if 'CCD_ID' in photons.colnames:
-            ind = ((photons['CCD_ID'] >= 0) &
-                   (photons['probability'] >= 0))
-            return photons[ind]
-        else:
-            # No photon hits detector
-            return photons[[]]
-
-    def calc_result(self, photons):
-        filtered = self.filter_photon_list(photons)
         aeff = np.zeros(len(self.orders))
         disporders = self.orders != 0
 
@@ -198,7 +260,7 @@ class CaptureResAeff(object):
 
             for i, o in enumerate(self.orders):
                 aeff[i] = filtered['probability'][filtered[self.order_col] == o].sum()
-            aeff = aeff / self.find_photon_number(photons) * self.Ageom
+            aeff = aeff / n_photons * self.Ageom
             # Division by 0 causes more nans, so filter those out
             # Also, res is nan if less than 20 photons are detected
             # so we need to filter those out, too.
@@ -211,7 +273,7 @@ class CaptureResAeff(object):
         # The following lines work for an empty photon list, too.
         aeffgrat = np.sum(aeff[disporders])
         aeff0 = np.sum(aeff[~disporders])
-        return {'Aeff0': aeff0, 'Aeffgrat': aeffgrat,'Aeff': aeff,
+        return {'Aeff0': aeff0, 'Aeffgrat': aeffgrat, 'Aeff': aeff,
                 'Rgrat': avggratres, 'R': res}
 
     def __call__(self, parameters, photons):
