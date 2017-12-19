@@ -335,7 +335,7 @@ class ArcusForPlot(PerfectArcus):
         detectors need different parameters. Placing this specific code in it's own
         function makes it easy to override for derived classes.
         '''
-        return [DetTwoStrips(conf)]
+        return [DetCamera(conf)]
 
 
 class ArcusForSIXTE(Arcus):
