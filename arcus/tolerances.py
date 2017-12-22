@@ -20,7 +20,10 @@ def singletolerance(photons_in, instrum_before,
         instrum = wigglefunc(pars)
         p_out = instrum(photons.copy())
         p_out = instrum_after(p_out)
-        ind = np.isfinite(p_out['det_x']) & (p_out['probability'] > 0)
+        if 'det_x' in p_out.colnames:
+            ind = np.isfinite(p_out['det_x']) & (p_out['probability'] > 0)
+        else:
+            ind = []
         derive_result(pars, p_out[ind], len(p_out))
 
 
@@ -143,7 +146,7 @@ class PeriodVariation(ParallelUncertainty):
 
     This class needs to be instantiated with the gratings, e.g.
 
-    >>> dvar = PeriodVariation(elements, class=CATGratings)
+    >>> dvar = PeriodVariation(elements, CATGrating) # doctest: +SKIP
 
     and the parameters are expected to have two components:
     center and sigma of a Gaussian distribution for grating contstant d.
@@ -157,6 +160,13 @@ class PeriodVariation(ParallelUncertainty):
         for e in self.parallels:
             self.apply_uncertainty(e, parameters)
         return self.elements
+
+
+class ScatterVariation(PeriodVariation):
+    '''Change the scatter properties of an SPO'''
+    def apply_uncertainty(self, e, parameters):
+        e.inplanescatter = parameters[0]
+        e.perpplanescatter = parameters[1]
 
 
 class CaptureResAeff(object):
@@ -276,7 +286,7 @@ class CaptureResAeff(object):
         return {'Aeff0': aeff0, 'Aeffgrat': aeffgrat, 'Aeff': aeff,
                 'Rgrat': avggratres, 'R': res}
 
-    def __call__(self, parameters, photons):
-        out = self.calc_result(photons)
+    def __call__(self, parameters, photons, n_photons):
+        out = self.calc_result(photons, n_photons)
         out['Parameters'] = parameters
         self.tab.add_row(out)
