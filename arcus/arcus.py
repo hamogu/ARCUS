@@ -41,13 +41,15 @@ id_num_offset = {'1': 0,
 
 # Set a little above entrance pos (the mirror) for display purposes.
 # Thus, needs to be geometrically bigger for off-axis sources.
-fac = 1.5
+# with fac > 0.5
+fac = 1.
 spopos = np.array(spo.spo_pos4d)
-rmid = 0.5 * (spopos[:, 2, 3].max() + spopos[:, 2, 3].min())
+rmid = 0.5 * (spopos[:, 1, 3].max() + spopos[:, 1, 3].min())
 delta_r = spo.spogeom['outer_radius'] - spo.spogeom['inner_radius']
-rdim = spopos[:, 2, 3].max() - rmid + fac * delta_r.max()
-aperzoom = [1, spopos[:, 1, 3].max() + fac * spo.spogeom['azwidth'].max(),
-            rdim]
+rdim = spopos[:, 1, 3].max() - rmid + fac * delta_r.max()
+aperzoom = [1, spopos[:, 0, 3].max() + fac * spo.spogeom['azwidth'].max(),
+            rdim
+            ]
 
 
 class Aperture(optics.MultiAperture):
@@ -95,7 +97,7 @@ class SimpleSPOs(Sequence):
             entrancepos[2] += 12000
             rot = np.eye(3) if '1' in chan else rot180
             mirror.append(spo.SPOChannelMirror(position=entrancepos,
-                                               orientation=np.dot(rot, xyz2zxy[:3, :3]),
+                                               orientation=rot,
                                                id_num_offset=id_num_offset[chan]))
             mirror.append(spo.ScatterPerChannel(position=entrancepos,
                                                 min_id=id_num_offset[chan],
@@ -307,11 +309,47 @@ class PerfectArcus(Sequence):
         super(PerfectArcus, self).__init__(elements=elem,
                                            postprocess_steps=self.post_process(),
                                            **kwargs)
+# Factor 0.8 for global
+# change axis order for SPOs
+# [SPOChannelMirror, 'individual', [12.5, 100, 50, 300, 300, 10]]
+# [SPOChannelMirror, 'global', [0, 0, 0, 0, 0, 0]]
+# [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]]
+# [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]]
+# [CATWindows, 'individual', [1000, 1000, 200, 300, 180, 300]]
+# [FlatDetector, 'global', [5000, 2000, 1000, 180, 180, 180]]
+
+# change axis order for SPOs
+# CBE Capabilities
+# [SPOChannelMirror, 'individual', [6,6,6,180., 180, 5.]]
+# [SPOChannelMirror, 'global', [0, 0, 0, 0, 0, 0]]
+# [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]]
+# [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]]
+# [CATWindows, 'individual', [1000, 1000, 200, 300, 180, 300]]
+# [FlatDetector, 'global', [5000, 2000, 1000, 180, 180, 180]]
+
+def reformat_randall_errorbudget(budget):
+    for row in budget:
+        tol = np.array(row[2])
+        tol[:3] = tol[:3] / 1000.  # mu to mm
+        tol[3:] = np.deg2rad(tol[3:] / 3600.)  # arcsec to rad
+        if row[1] == 'global':
+            tol *= 0.8  # mean abs distance for Gauss is 0.8 sigma
+        tol = tol / 3  # Randall gives 3 sigma values
+        row.append(tol)
 
 
 class Arcus(PerfectArcus):
-    def __init__(self, **kwargs):
-        super(Arcus, self).__init__(**kwargs)
+    def __init__(self, conf=defaultconf, channels=['1', '2', '1m', '2m'],
+                 **kwargs):
+        super(Arcus, self).__init__(conf=conf, channels=channels, **kwargs)
+        # for row in conf['alignmentbudget']:
+        #     if row[1] == 'global':
+        #         wig = tol.WiggleGlobalParallel(self, row[1])
+        #     elif row[1] == 'individual':
+        #         wig = tol.WiggleIndividualElements(self, row[1])
+        #     else:
+        #         raise NotImplementedError('Alignment error {} not implmented'.format(row[1]))
+        #     out = wig(row[3])
 
 
 

@@ -12,6 +12,7 @@ from marxs.math.utils import e2h, h2e, norm_vector
 from marxs.math.polarization import parallel_transport
 
 from .load_csv import load_table, load_number
+from .constants import xyz2zxy
 
 inplanescatter = 10. / 2.3545 / 3600 / 180. * np.pi
 perpplanescatter = 1.5 / 2.345 / 3600. / 180. * np.pi
@@ -35,6 +36,7 @@ for row, ang in zip(spogeom, u.Quantity(spogeom['clocking_angle']).to(u.rad).val
                               row['azwidth'] / 2.,
                               (row['outer_radius'] - row['inner_radius']) / 2.]))
 
+spo_pos4d = [np.dot(xyz2zxy, s) for s in spo_pos4d]
 
 class PerfectLensSegment(PerfectLens):
     def __init__(self, **kwargs):
