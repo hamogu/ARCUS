@@ -14,7 +14,7 @@ import marxs.analysis
 
 from .ralfgrating import (InterpolateRalfTable, RalfQualityFactor,
                           catsupportbars, catsupport,
-                          CATfromMechanical)
+                          CATfromMechanical, CATWindow)
 from . import spo
 from . import boom
 from .load_csv import load_number, load_table
@@ -32,6 +32,47 @@ defaultconf = make_rowland_from_d_BF_R_f(600., 5915.51307, 12000. - 123.569239)
 defaultconf['blazeang'] = 1.8
 defaultconf['n_CCDs'] = 16
 defaultconf['phi_det_start'] = 0.037
+
+
+def reformat_randall_errorbudget(budget):
+    '''Reformat the numbers from LSF-CAT-Alignment-v3.xls
+
+    Randall gives 3 sigma errors, while I need 1 sigma a input here.
+    Also, units need to be converted: mu -> mm, arcsec -> rad
+    Last, global misalignment (that's not random) must be
+    scaled in some way. Here, I use 0.8 sigma, which is the
+    mean absolute deviation for a Gaussian.
+    '''
+    for row in budget:
+        tol = np.array(row[2], dtype=float)
+        tol[:3] = tol[:3] / 1000.  # mu to mm
+        tol[3:] = np.deg2rad(tol[3:] / 3600.)  # arcsec to rad
+        if row[1] == 'global':
+            tol *= 0.8  # mean abs distance for Gauss is 0.8 sigma
+        tol = tol / 3  # Randall gives 3 sigma values
+        row.append(tol)
+
+
+align_requirement = [
+    [spo.SPOChannelMirror, 'individual', [12.5, 100, 50, 300, 300, 10]],
+    [spo.SPOChannelMirror, 'global', [0., 0, 0, 0, 0, 0]],
+    [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]],
+    [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]],
+    [CATWindow, 'individual', [1000, 1000, 200, 300, 180, 300]],
+    [FlatDetector, 'global', [5000, 2000, 1000, 180, 180, 180]]]
+'''This is taken from LSF-CAT-Alignment-v3.xls from R. Smith'''
+reformat_randall_errorbudget(align_requirement)
+
+# change axis order for SPOs
+# CBE Capabilities
+# [SPOChannelMirror, 'individual', [6,6,6,180., 180, 5.]]
+# [SPOChannelMirror, 'global', [0, 0, 0, 0, 0, 0]]
+# [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]]
+# [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]]
+# [CATWindows, 'individual', [1000, 1000, 200, 300, 180, 300]]
+# [FlatDetector, 'global', [5000, 2000, 1000, 180, 180, 180]]
+
+defaultconf['alignmentbudget'] = align_requirement
 
 id_num_offset = {'1': 0,
                  '2': 1000,
@@ -309,48 +350,20 @@ class PerfectArcus(Sequence):
         super(PerfectArcus, self).__init__(elements=elem,
                                            postprocess_steps=self.post_process(),
                                            **kwargs)
-# Factor 0.8 for global
-# change axis order for SPOs
-# [SPOChannelMirror, 'individual', [12.5, 100, 50, 300, 300, 10]]
-# [SPOChannelMirror, 'global', [0, 0, 0, 0, 0, 0]]
-# [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]]
-# [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]]
-# [CATWindows, 'individual', [1000, 1000, 200, 300, 180, 300]]
-# [FlatDetector, 'global', [5000, 2000, 1000, 180, 180, 180]]
-
-# change axis order for SPOs
-# CBE Capabilities
-# [SPOChannelMirror, 'individual', [6,6,6,180., 180, 5.]]
-# [SPOChannelMirror, 'global', [0, 0, 0, 0, 0, 0]]
-# [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]]
-# [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]]
-# [CATWindows, 'individual', [1000, 1000, 200, 300, 180, 300]]
-# [FlatDetector, 'global', [5000, 2000, 1000, 180, 180, 180]]
-
-def reformat_randall_errorbudget(budget):
-    for row in budget:
-        tol = np.array(row[2])
-        tol[:3] = tol[:3] / 1000.  # mu to mm
-        tol[3:] = np.deg2rad(tol[3:] / 3600.)  # arcsec to rad
-        if row[1] == 'global':
-            tol *= 0.8  # mean abs distance for Gauss is 0.8 sigma
-        tol = tol / 3  # Randall gives 3 sigma values
-        row.append(tol)
 
 
 class Arcus(PerfectArcus):
     def __init__(self, conf=defaultconf, channels=['1', '2', '1m', '2m'],
                  **kwargs):
         super(Arcus, self).__init__(conf=conf, channels=channels, **kwargs)
-        # for row in conf['alignmentbudget']:
-        #     if row[1] == 'global':
-        #         wig = tol.WiggleGlobalParallel(self, row[1])
-        #     elif row[1] == 'individual':
-        #         wig = tol.WiggleIndividualElements(self, row[1])
-        #     else:
-        #         raise NotImplementedError('Alignment error {} not implmented'.format(row[1]))
-        #     out = wig(row[3])
-
+        for row in conf['alignmentbudget']:
+            if row[1] == 'global':
+                wig = tol.WiggleGlobalParallel(self, row[1])
+            elif row[1] == 'individual':
+                wig = tol.WiggleIndividualElements(self, row[1])
+            else:
+                raise NotImplementedError('Alignment error {} not implmented'.format(row[1]))
+            out = wig(row[3])
 
 
 class ArcusForPlot(PerfectArcus):
