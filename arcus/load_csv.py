@@ -7,22 +7,31 @@ from . import conf
 
 hash_displayed = False
 
+# subprocess uses fork internally, which makes a child process
+# that essentially makes a copy of everything that python has
+# in memory, essentially doubling the memory footprint of python
+# at that point. For long running scripts with big simulations that
+# can be enough to run out of memory.
+# So, just get this info once during the first import and save in
+# module-level variables.
+git_hash = subprocess.check_output(["git", "describe", "--always"],
+                                   cwd=conf.caldb_inputdata)[:-1]
+
+git_info = subprocess.check_output(['git', 'show', '-s', '--format=%ci',
+                                    git_hash],
+                                   cwd=conf.caldb_inputdata)
+
 
 class DataFileFormatException(Exception):
     pass
 
 
 def get_git_hash():
-    return subprocess.check_output(["git", "describe", "--always"],
-                                   cwd=conf.caldb_inputdata)[:-1]
+    return git_hash
 
 
 def string_git_info():
-    githash = get_git_hash()
-    date = subprocess.check_output(['git', 'show', '-s', '--format=%ci',
-                                    githash],
-                                   cwd=conf.caldb_inputdata)
-    return 'hash: {} (commited on {})'.format(githash, date[:-15])
+    return 'hash: {} (commited on {})'.format(git_hash, git_info[:-15])
 
 
 def log_tab_metadata(dirname, filename, tab):
