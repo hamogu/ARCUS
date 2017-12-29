@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+import inspect
+
 import numpy as np
 from transforms3d import affines, euler
 from astropy.table import Table
@@ -53,6 +55,9 @@ class ParallelUncertainty(object):
     '''
     def __init__(self, elements, parallel_class=None):
         self.elements = elements
+        # cannot be used to find functions
+        if not inspect.isclass(parallel_class):
+            raise ValueError('{} is not a class.'.format(parallel_class))
         self.parallel_class = parallel_class
 
     def find_parallel(self, obj):

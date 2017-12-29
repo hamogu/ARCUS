@@ -54,27 +54,6 @@ def reformat_randall_errorbudget(budget):
         row.append(tol)
 
 
-align_requirement = [
-    [spo.SPOChannelMirror, 'individual', [12.5, 100, 50, 300, 300, 10]],
-    [spo.SPOChannelMirror, 'global', [0., 0, 0, 0, 0, 0]],
-    [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]],
-    [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]],
-    [CATWindow, 'individual', [1000, 1000, 200, 300, 180, 300]],
-    [FlatDetector, 'global', [5000, 2000, 1000, 180, 180, 180]]]
-'''This is taken from LSF-CAT-Alignment-v3.xls from R. Smith'''
-reformat_randall_errorbudget(align_requirement)
-
-# change axis order for SPOs
-# CBE Capabilities
-# [SPOChannelMirror, 'individual', [6,6,6,180., 180, 5.]]
-# [SPOChannelMirror, 'global', [0, 0, 0, 0, 0, 0]]
-# [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]]
-# [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]]
-# [CATWindows, 'individual', [1000, 1000, 200, 300, 180, 300]]
-# [FlatDetector, 'global', [5000, 2000, 1000, 180, 180, 180]]
-
-defaultconf['alignmentbudget'] = align_requirement
-
 id_num_offset = {'1': 0,
                  '2': 1000,
                  '1m': 10000,
@@ -359,11 +338,11 @@ class Arcus(PerfectArcus):
         super(Arcus, self).__init__(conf=conf, channels=channels, **kwargs)
         for row in conf['alignmentbudget']:
             if row[1] == 'global':
-                wig = tol.WiggleGlobalParallel(self, row[1])
+                wig = tol.WiggleGlobalParallel(self, row[0])
             elif row[1] == 'individual':
-                wig = tol.WiggleIndividualElements(self, row[1])
+                wig = tol.WiggleIndividualElements(self, row[0])
             else:
-                raise NotImplementedError('Alignment error {} not implmented'.format(row[1]))
+                raise NotImplementedError('Alignment error {} not implemented'.format(row[1]))
             out = wig(row[3])
 
 
@@ -391,3 +370,25 @@ class ArcusForSIXTE(Arcus):
 
     def add_detectors(self, conf):
         return [FocalPlaneDet()]
+
+
+align_requirement = [
+    [spo.SPOChannelMirror, 'individual', [12.5, 100, 50, 300, 300, 10]],
+    [spo.SPOChannelMirror, 'global', [0., 0, 0, 0, 0, 0]],
+    [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]],
+    [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]],
+    [CATWindow, 'individual', [1000, 1000, 200, 300, 180, 300]],
+    [DetCamera, 'global', [5000, 2000, 1000, 180, 180, 180]]]
+'''This is taken from LSF-CAT-Alignment-v3.xls from R. Smith'''
+reformat_randall_errorbudget(align_requirement)
+
+# change axis order for SPOs
+# CBE Capabilities
+# [SPOChannelMirror, 'individual', [6,6,6,180., 180, 5.]]
+# [SPOChannelMirror, 'global', [0, 0, 0, 0, 0, 0]]
+# [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]]
+# [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]]
+# [CATWindows, 'individual', [1000, 1000, 200, 300, 180, 300]]
+# [FlatDetector, 'global', [5000, 2000, 1000, 180, 180, 180]]
+
+defaultconf['alignmentbudget'] = align_requirement
