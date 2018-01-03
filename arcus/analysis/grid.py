@@ -5,7 +5,7 @@ import glob
 import numpy as np
 from astropy.table import Table
 import astropy.units as u
-from marxs.analysis.gratings import resolvingpower_from_photonlist
+from marxs.analysis.gratings import resolvingpower_from_photonlist as respow
 
 chan_name = ['1', '2', '1m', '2m']
 orders = np.arange(-12, 1)
@@ -82,6 +82,22 @@ def analyse_sim(photons, orders, apertures, reference_meta, conf):
     conf : dict
         Arcus configuration (the zero order position for each channel
         is taken from this dict).
+
+    Returns
+    -------
+    res : np.array
+        Array of R values for each aperture and order, measured from
+        photons that hit a CCD
+    relaeff : np.array
+        Relative Aeff for each aperture and order
+    res_circ : np.array
+        Array of R values for each aperture and order, as measured from
+        the ``circ_phi`` column. For signal close to a CCD boundary, the
+        detected photon distribution may be artificially narrow. This takes
+        all photons into account to avoid that problem. In general it is
+        better to use res (because the CCDs don't follow the Rowland circle
+        exactly) but it's so close that ``res_circ`` can be used for those
+        cases.
     '''
     if apertures is None:
         apertures = list(set(photons['aperture']))
@@ -90,16 +106,28 @@ def analyse_sim(photons, orders, apertures, reference_meta, conf):
     check_energy_consistent(photons)
 
     res = np.zeros((len(apertures), len(orders)))
+    res_circ = np.zeros((len(apertures), len(orders)))
     relaeff = np.zeros_like(res)
     for ia, a in enumerate(apertures):
-        pa = photons[photons['aperture'] == a]
-
-        good = (pa['CCD'] >= 0) & (pa['probability'] > 0)
-        res_a, pos_a, std_a = resolvingpower_from_photonlist(pa[good], orders,
-                                                             zeropos=conf['pos_opt_ax'][chan_name[a]][0])
+        pa = photons[(photons['aperture'] == a) &
+                     (photons['CCD'] >= 0) &
+                     (photons['probability'] > 0)]
+        zeropos = conf['pos_opt_ax'][chan_name[a]][0]
+        res_a, pos_a, std_a = respow(pa, orders, zeropos=zeropos)
         res[ia, :] = res_a
-        relaeff[ia, :] = rel_aeff_from_photonlist(pa, orders)
-    return res, relaeff
+
+        if 'circ_phi' in photons.colnames:
+            pc = photons[(photons['aperture'] == a) &
+                         np.isfinite(photons['circ_phi']) &
+                         (photons['probability'] > 0)]
+            zeropos = np.arcsin((conf['d'] - conf['pos_opt_ax'][chan_name[a]][0]) /
+                                conf['rowland_detector'].r)
+            res_c, pos_c, std_c = respow(pc, orders, col='circ_phi',
+                                     zeropos=zeropos)
+            res_circ[ia, :] = res_c
+        paper = photons[photons['aperture'] == a]
+        relaeff[ia, :] = rel_aeff_from_photonlist(paper, orders)
+    return res, relaeff, res_circ
 
 
 def aeffRfromraygrid(inpath, aperture, conf, outfile):
@@ -116,28 +144,36 @@ def aeffRfromraygrid(inpath, aperture, conf, outfile):
     outfile : string
         File names to save output table
     '''
-    rayfiles = glob(os.path.join(inpath, '*.fits'))
+    rayfiles = glob.glob(os.path.join(inpath, '*.fits'))
     rayfiles.sort()
     r0 = Table.read(rayfiles[0])
     energies = np.zeros(len(rayfiles))
     res = np.zeros((len(rayfiles), len(apertures), len(orders)))
+    res_circ = np.zeros_like(res)
     aeff = np.zeros_like(res)
 
     for ifile, rayfile in enumerate(rayfiles):
         obs = Table.read(rayfile)
-        res_i, relaeff_i = analyse_sim(obs, orders, apertures, r0.meta, conf)
+        res_i, relaeff_i, res_circ_i = analyse_sim(obs, orders, apertures, r0.meta, conf)
         res[ifile, :, :] = res_i
+        res_circ[ifile, :, :] = res_circ_i
         aeff[ifile, :, :] = relaeff_i
         energies[ifile] = obs['energy'][0]
 
+    res_clean = np.minimum(res, res_circ)
     a_geom = u.Quantity([a.area.to(u.cm**2) for a in aperture.elements])
     aeff = aeff * a_geom[None, :, None]
     wave = (energies * u.keV).to(u.Angstrom, equivalencies=u.spectral())
     aeff_4 = aeff.sum(axis=1)
-    res_4 = np.ma.masked_invalid(np.ma.average(res, weights=aeff, axis=1))
-
-    out = Table([energies, wave, res, aeff, aeff_4, res_4],
-                names=['energy', 'wave', 'R', 'Aeff', 'R4', 'Aeff4'])
+    res_4 = np.ma.masked_invalid(np.ma.average(res_clean,
+                                               weights=aeff, axis=1))
+    res_disp = np.ma.average(res_4[:, :-1],
+                             weights=np.ma.masked_equal(aeff_4[:, :-1], 0),
+                             axis=1)
+    out = Table([energies, wave, res, res_circ, res_clean,
+                 aeff, aeff_4, res_4, res_disp],
+                names=['energy', 'wave', 'Rccd', 'Rcirc', 'R',
+                       'Aeff', 'Aeff4', 'R4', 'R_disp'])
     out['energy'].unit = u.keV
     out['wave'].unit = u.Angstrom
     out['Aeff'].unit = u.cm**2
@@ -156,5 +192,5 @@ def csv_per_order(infile, col, outfile):
     '''
     tab = Table.read(infile)
     outtab = Table(tab[col], names=['order_{0}'.format(o) for o in orders])
-    outtab.add_column(data=tab['wave'], index=0)
+    outtab.add_column(tab['wave'], index=0)
     outtab.write(outfile, format='ascii.csv', overwrite=True)

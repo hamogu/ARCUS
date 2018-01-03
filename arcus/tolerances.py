@@ -182,7 +182,7 @@ class CaptureResAeff(object):
     will be analysed for resolving power and effective area in a number of
     relevant orders.
     Every instance of this object has a ``tab`` attribute and every time the
-    instance is called it wadd one row of data to the table.
+    instance is called it adds one row of data to the table.
 
     Parameters
     ----------
@@ -196,7 +196,7 @@ class CaptureResAeff(object):
     on_detector_test : callable
         A function that can be called on a photon table and returns a
         boolean array with elements set to ``True`` for photons that hit
-        the detector. (In order to calcu
+        the detector.
     '''
     orders = np.arange(-10, 1)
 
