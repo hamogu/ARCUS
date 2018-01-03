@@ -35,7 +35,7 @@ defaultconf['n_CCDs'] = 16
 defaultconf['phi_det_start'] = 0.037
 
 
-def reformat_randall_errorbudget(budget):
+def reformat_randall_errorbudget(budget, globalfac=0.8):
     '''Reformat the numbers from LSF-CAT-Alignment-v3.xls
 
     Randall gives 3 sigma errors, while I need 1 sigma a input here.
@@ -43,15 +43,33 @@ def reformat_randall_errorbudget(budget):
     Last, global misalignment (that's not random) must be
     scaled in some way. Here, I use 0.8 sigma, which is the
     mean absolute deviation for a Gaussian.
+
+    Parameters
+    ----------
+    budget : list
+        See reference implementation for list format
+    globalfac : ``None`` or float
+        Factor to apply for global tolerances. A "global" tolerance is drawn
+        only once per simulation. In contrast, for "individual" tolerances
+        many draws are done and thus the resulting layout actually
+        represents a distribution. For a "global" tolerance, the result hinges
+        essentially on a single random draw. If this is set to ``None``,
+        misalignments are drawn statistically. Instead, the toleracnes can be
+        scaled determinisitically, e.g. by "0.8 sigma" (the mean absolute
+        deviation for a Gaussian distribution).
     '''
     for row in budget:
         tol = np.array(row[2], dtype=float)
         tol[:3] = tol[:3] / 1000.  # mu to mm
         tol[3:] = np.deg2rad(tol[3:] / 3600.)  # arcsec to rad
+        tol = tol / 3   # Randall gives 3 sigma values
         if row[1] == 'global':
-            tol *= 0.8  # mean abs distance for Gauss is 0.8 sigma
-        tol = tol / 3  # Randall gives 3 sigma values
-        row.append(tol)
+            if globalfac is not None:
+                tol *= globalfac
+            else:
+                tol *= np.random.randn(len(tol))
+
+        row[3] = tol
 
 
 id_num_offset = {'1': 0,
@@ -372,23 +390,22 @@ class ArcusForSIXTE(Arcus):
         return [FocalPlaneDet()]
 
 
-align_requirement = [
-    [spo.SPOChannelMirror, 'individual', [12.5, 100, 50, 300, 300, 10]],
-    [spo.SPOChannelMirror, 'global', [0., 0, 0, 0, 0, 0]],
-    [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]],
-    [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]],
-    [CATWindow, 'individual', [1000, 1000, 200, 300, 180, 300]],
-    [DetCamera, 'global', [5000, 2000, 1000, 180, 180, 180]]]
+align_requirement_smith = [
+    [spo.SPOChannelMirror, 'individual', [12.5, 100, 50, 300, 300, 10],
+     None, 'individual SPO in petal'],
+    [spo.SPOChannelMirror, 'global', [0., 0, 0, 0, 0, 0],
+     None, 'SPO petal to front assembly'],
+    [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600],
+     None, 'CAT petal to SPO petal'],
+    [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300],
+     None, 'CAT windows to CAT petal'],
+    [CATWindow, 'individual', [1000, 1000, 200, 300, 180, 300],
+     None, 'individual CAT to window'],
+    [DetCamera, 'global', [5000, 2000, 1000, 180, 180, 180],
+     None, 'Camera to front assembly']]
 '''This is taken from LSF-CAT-Alignment-v3.xls from R. Smith'''
-reformat_randall_errorbudget(align_requirement)
 
-# change axis order for SPOs
-# CBE Capabilities
-# [SPOChannelMirror, 'individual', [6,6,6,180., 180, 5.]]
-# [SPOChannelMirror, 'global', [0, 0, 0, 0, 0, 0]]
-# [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600]]
-# [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300]]
-# [CATWindows, 'individual', [1000, 1000, 200, 300, 180, 300]]
-# [FlatDetector, 'global', [5000, 2000, 1000, 180, 180, 180]]
+align_requirement = deepcopy(align_requirement_smith)
+reformat_randall_errorbudget(align_requirement)
 
 defaultconf['alignmentbudget'] = align_requirement
