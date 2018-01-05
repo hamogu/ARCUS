@@ -2,7 +2,8 @@ import numpy as np
 from transforms3d.euler import euler2mat
 from transforms3d.affines import compose
 import astropy.units as u
-from scipy.interpolate import interp1d
+from scipy.interpolate import RectBivariateSpline
+from numpy.core.umath_tests import inner1d
 
 from marxs.optics.aperture import RectangleAperture, MultiAperture
 from marxs.optics import (PerfectLens, GlobalEnergyFilter,
@@ -11,7 +12,7 @@ from marxs.simulator import Parallel
 from marxs.math.utils import e2h, h2e, norm_vector
 from marxs.math.polarization import parallel_transport
 
-from .load_csv import load_table, load_number
+from .load_csv import load_table2d, load_number, load_table
 from .constants import xyz2zxy
 
 inplanescatter = 10. / 2.3545 / 3600 / 180. * np.pi
@@ -38,6 +39,12 @@ for row, ang in zip(spogeom, u.Quantity(spogeom['clocking_angle']).to(u.rad).val
 
 spo_pos4d = [np.dot(xyz2zxy, s) for s in spo_pos4d]
 
+reflectivity = load_table2d('spos', 'reflectivity')
+reflectivity_interpolator = RectBivariateSpline(reflectivity[0].data,
+                                                reflectivity[1].data,
+                                                reflectivity[3][0])
+
+
 class PerfectLensSegment(PerfectLens):
     def __init__(self, **kwargs):
         self.d_center_optax = kwargs.pop('d_center_optical_axis')
@@ -48,10 +55,16 @@ class PerfectLensSegment(PerfectLens):
         # So, find out where a central ray would go.
         p_opt_axis = self.geometry('center') - self.d_center_optax * self.geometry('e_z')
         focuspoints = h2e(p_opt_axis) + self.focallength * norm_vector(h2e(photons['dir'][intersect]))
-        dir = e2h(focuspoints - h2e(interpos[intersect]), 0)
+        dir = norm_vector(e2h(focuspoints - h2e(interpos[intersect]), 0))
         pol = parallel_transport(photons['dir'].data[intersect, :], dir,
                                  photons['polarization'].data[intersect, :])
-        return {'dir': dir, 'polarization': pol}
+        angle = np.arccos(np.abs(inner1d(h2e(dir),
+                                         norm_vector(h2e(photons['dir'][intersect])))))
+        return {'dir': dir, 'polarization': pol,
+                'probability': reflectivity_interpolator(photons['energy'][intersect],
+                                                         np.rad2deg(angle) / 2,
+                                                         grid=False)**2
+                }
 
 
 class SPOChannelMirror(Parallel):
@@ -75,14 +88,6 @@ class SPOChannelasAperture(MultiAperture):
 geometricopening = load_number('spos', 'geometricthroughput', 'transmission')
 geometricthroughput = GlobalEnergyFilter(filterfunc=lambda e: geometricopening,
                                          name='SPOgeometricthrougput')
-
-
-def get_reflectivityfilter():
-    tab = load_table('spos', 'reflectivity_simple')
-    en = tab['energy'].to(u.keV, equivalencies=u.spectral())
-    return GlobalEnergyFilter(filterfunc=interp1d(en, tab['reflectivity']**2),
-                              name='double relectivity')
-doublereflectivity = get_reflectivityfilter()
 
 
 class ScatterPerChannel(RadialMirrorScatter):
