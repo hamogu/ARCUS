@@ -6,7 +6,6 @@ from marxs.base import SimulationSequenceElement
 from marxs.optics import GlobalEnergyFilter, CATGrating
 from marxs.optics.base import OpticalElement
 from marxs.simulator import ParallelCalculated, Parallel
-from warnings import warn
 
 from .load_csv import load_table2d, load_number, load_table
 
@@ -43,12 +42,10 @@ class InterpolateRalfTable(object):
     '''
 
     def __init__(self, k=3):
-        wave, theta, names, orders = load_table2d('gratings', 'efficiency')
+        tab, wave, theta, orders = load_table2d('gratings', 'efficiency')
         theta = theta.to(u.rad)
         # Order is int, we will never interpolate about order,
-        # thus, we'll just have
-        # len(order) 2d interpolations
-        self.orders = -np.array([int(n[1:]) for n in names])
+        self.orders = np.array([int(n) for n in tab.colnames[2:]])
         self.interpolators = [RectBivariateSpline(wave, theta, d, kx=k, ky=k) for d in orders]
 
     def probabilities(self, energies, pol, blaze):
@@ -280,8 +277,6 @@ class CATfromMechanical(Parallel):
         kwargs['elem_args']['elem_args'] = [{'d': d} for d in d_grat]
         kwargs['elem_args']['elem_pos'] = gratingpos
         kwargs['elem_args']['id_num_offset'] = id_start
-        #import pdb
-        #pdb.set_trace()
         super(CATfromMechanical, self).__init__(**kwargs)
 
     def generate_elements(self):
@@ -297,6 +292,7 @@ As long as the efficiency table is the same for all CAT gratings, it makes
 sense to define that globaly. If every grating had its own independent
 order selector, we would have to read the selector file a few hundred times.
 '''
+
 
 class CATWindow(Parallel):
 

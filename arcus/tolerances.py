@@ -198,7 +198,7 @@ class CaptureResAeff(object):
         boolean array with elements set to ``True`` for photons that hit
         the detector.
     '''
-    orders = np.arange(-10, 1)
+    orders = np.arange(-15, 5)
 
     order_col = 'order'
     '''Column names for grating orders'''

@@ -133,9 +133,10 @@ def load_table2d(dirname, filename):
 
     Returns
     -------
+    tab : `astropy.table.Table`
+        Table as read in. Useful to access units or other meta data.
     x, y : `astropy.table.Column`
-    colnames : list
-        List of names of the other columns (which hold the data)
+        Unique entries in first and second column
     dat : np.array
         The remaining outputs are np.arrays of shape (len(x), len(y))
     '''
@@ -152,7 +153,6 @@ def load_table2d(dirname, filename):
 
     x = x[::n_y]
     y = y[:n_y]
-    colnames = tab.colnames[2:]
     coldat = [tab[d].data.reshape(n_x, n_y) for d in tab.columns[2:]]
 
-    return x, y, colnames, coldat
+    return tab, x, y, coldat

@@ -8,7 +8,7 @@ import astropy.units as u
 from marxs.analysis.gratings import resolvingpower_from_photonlist as respow
 
 chan_name = ['1', '2', '1m', '2m']
-orders = np.arange(-12, 1)
+orders = np.arange(-15, 5)
 apertures = np.arange(4)
 
 
