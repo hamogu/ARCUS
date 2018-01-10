@@ -62,7 +62,7 @@ class PerfectLensSegment(PerfectLens):
                                          norm_vector(h2e(photons['dir'][intersect])))))
         return {'dir': dir, 'polarization': pol,
                 'probability': reflectivity_interpolator(photons['energy'][intersect],
-                                                         angle / 2,
+                                                         angle / 4,
                                                          grid=False)**2
                 }
 

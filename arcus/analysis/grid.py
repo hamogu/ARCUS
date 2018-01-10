@@ -71,7 +71,7 @@ def analyse_sim(photons, orders, apertures, reference_meta, conf):
     ----------
     photons : `astropy.table.Table`
         Photon event list
-    order : np.array
+    orders : np.array
         list of orders to be analyzed
     apertures : list or None
         List of values used in ``photons['aperture']`` column.
@@ -184,6 +184,15 @@ def aeffRfromraygrid(inpath, aperture, conf, outfile):
     out.write(outfile, overwrite=True)
 
 
+def orders_from_meta(meta):
+    orders = []
+    i = 0
+    while 'ORDER_{}'.format(i) in meta:
+        orders.append(meta['ORDER_{}'.format(i)])
+        i += 1
+    return np.array(orders)
+
+
 def csv_per_order(infile, col, outfile):
     '''Rewrite one column in ``aeffRfromraygrid`` to csv file
 
@@ -191,6 +200,6 @@ def csv_per_order(infile, col, outfile):
     csv table with one entry per cell.
     '''
     tab = Table.read(infile)
-    outtab = Table(tab[col], names=['order_{0}'.format(o) for o in orders])
+    outtab = Table(tab[col], names=['order_{0}'.format(o) for o in orders_from_meta(tab.meta)])
     outtab.add_column(tab['wave'], index=0)
     outtab.write(outfile, format='ascii.csv', overwrite=True)

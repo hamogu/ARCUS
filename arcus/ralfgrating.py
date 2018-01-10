@@ -1,6 +1,6 @@
 import numpy as np
 import astropy.units as u
-from scipy.interpolate import RectBivariateSpline
+from scipy.interpolate import RectBivariateSpline, interp1d
 import transforms3d
 from marxs.base import SimulationSequenceElement
 from marxs.optics import GlobalEnergyFilter, CATGrating
@@ -120,8 +120,7 @@ def catsupportbars(photons):
     return photons
 
 
-catsupport = GlobalEnergyFilter(filterfunc=lambda e: load_number('gratings', 'L1support', 'transmission') *
-                                load_number('gratings', 'L2support', 'transmission'))
+catsupport = GlobalEnergyFilter(filterfunc=lambda e: load_number('gratings', 'L2support', 'transmission'))
 
 
 class RectangularGrid(ParallelCalculated, OpticalElement):
@@ -292,6 +291,39 @@ As long as the efficiency table is the same for all CAT gratings, it makes
 sense to define that globaly. If every grating had its own independent
 order selector, we would have to read the selector file a few hundred times.
 '''
+l1relativearea = load_number('gratings', 'L1support', 'transmission')
+l1transtab = load_table('gratings', 'L1transmission')
+l1transmission = interp1d(l1transtab['energy'].to(u.keV, equivalencies=u.spectral()),
+                          l1transtab['transmission'])
+
+
+class CATGratingwithL1(CATGrating):
+    '''Modified CAT grating class
+
+    CAT gratings of this class determine (statistically) if a photon
+    passes through the grating bars or the L1 support.
+    The L1 support is simplified as solid Si layer of 4 mu thickness.
+    '''
+    l1transmission = l1transmission
+
+    def specific_process_photons(self, photons, intersect,
+                                 interpos, intercoos):
+        catresult = super(CATGratingwithL1, self).specific_process_photons(photons, intersect, interpos, intercoos)
+
+        # Now select which photons go through the L1 support and
+        # set the numbers appropriately.
+        # It is easier to have the diffraction calculated for all photons
+        # and then re-set numbers for a small fraction here.
+        # That, way, I don't have to duplicate the blaze calculation and no
+        # crazy tricks are necessary to keep the indices correct.
+        l1 = np.random.rand(intersect.sum()) > l1relativearea
+        ind = intersect.nonzero()[0][l1]
+        catresult['dir'][l1] = photons['dir'].data[ind, :]
+        catresult['polarization'][l1] = photons['polarization'].data[ind, :]
+        catresult['order'][l1] = 0
+        catresult['probability'][l1] = l1transmission(photons['energy'][ind])
+
+        return catresult
 
 
 class CATWindow(Parallel):
@@ -300,6 +332,6 @@ class CATWindow(Parallel):
 
     def __init__(self, **kwargs):
         kwargs['id_col'] = self.id_col
-        kwargs['elem_class'] = CATGrating
+        kwargs['elem_class'] = CATGratingwithL1
         kwargs['elem_args']['order_selector'] = globalorderselector
         super(CATWindow, self).__init__(**kwargs)
