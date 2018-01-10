@@ -113,3 +113,50 @@ def combine_henke_reflectivity_solid_mirror(pattern, outfile):
     tab.meta['roughness'] = roughness
     tab.meta['polarization'] = polarization
     tab.write(outfile, format='ascii.ecsv')
+
+
+def combine_henke_reflectivity_bilayer_mirror(pattern, outfile):
+    '''Combine tables downloaded from CXRO
+
+    The CXRO website allows only to change one parameter at a time, for example
+    change the energy of a photon for a fixed inclination angle to get the
+    refelctivity. To build up a 2D distribution of reflectivity as a function of
+    energy and angle, several different tables have to be downloaded.
+    This function combines several downloaded files.
+
+    It only works for files from
+    http://henke.lbl.gov/optical_constants/bilayer.html
+    because it parses the meta data in the first line of the files and the
+    format of that metadata is different for e.g. multi-layer mirrors.
+
+    Parameters
+    ----------
+    pattern : string
+        pattern for glob with wildcards to identify all input files
+    outfile : string
+        Filename and path of the output file.
+    '''
+    taball = []
+    for filename in glob.iglob(pattern):
+        t = Table.read(filename, format='ascii.no_header', data_start=2,
+                       names=['energy', 'reflectivity', 'transmission'],
+                       guess=False)
+        with open(filename) as f:
+            firstline = f.readline().strip()
+        material, polarization = firstline.split(', ')
+        material, angle = material.split(' at ')
+        t['angle'] = float(angle.replace('deg', ''))
+        taball.append(t)
+    tab = vstack(taball)
+    # Sort correctly for read-in routine
+    tab.sort(['energy', 'angle'])
+    # Make defined column order
+    tab = tab['energy', 'angle', 'reflectivity']
+    tab['energy'] = tab['energy'] / 1000
+    tab['energy'].unit = u.keV
+    tab['angle'].unit = u.degree
+    tab.meta['Origin'] = 'CXRO'
+    tab.meta['url'] = 'http://henke.lbl.gov/optical_constants/bilayer.html'
+    tab.meta['material'] = material
+    tab.meta['polarization'] = polarization
+    tab.write(outfile, format='ascii.ecsv')
