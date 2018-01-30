@@ -9,6 +9,7 @@ from marxs.simulator import Parallel
 from marxs.design.uncertainties import generate_facet_uncertainty as genfacun
 from marxs.analysis.gratings import resolvingpower_from_photonlist as resol
 from marxs.analysis.gratings import AnalysisError
+from .ralfgrating import InterpolateRalfTable
 ''' Multiple energies at once or loop?
 '''
 
@@ -164,6 +165,45 @@ class PeriodVariation(ParallelUncertainty):
     def __call__(self, parameters):
         for e in self.parallels:
             self.apply_uncertainty(e, parameters)
+        return self.elements
+
+
+class OrderSelectorWavy(InterpolateRalfTable):
+    '''Add a random number to blaze angle before looking up Ralf Table
+
+    In the lab, it seems that the grating bars are not exactly
+    perpendicular to the "surface" of the grating. This class adds
+    a random number drawn from a Gaussian distribution to the blaze angle
+    before looking up the grating efficiency and selecting the order.
+
+    Parameters
+    ----------
+    wavysigma : float
+        Sigma of Gaussian distribution (in radian)
+    '''
+    def __init__(self, wavysigma, **kwargs):
+        self.sigma = wavysigma
+        super(OrderSelectorWavy, self).__init__(**kwargs)
+
+    def probabilities(self, energies, pol, blaze):
+        return super(OrderSelectorWavy, self).probabilities(energies, pol, blaze + self.sigma * np.random.randn(len(blaze)))
+
+
+class CATFlatnessVariation(ParallelUncertainty):
+    '''Randomly draw change from flatness for CAT gratings
+
+    This class needs to be instantiated with the gratings, e.g.
+
+    >>> dvar = PeriodVariation(elements, CATGrating) # doctest: +SKIP
+
+    and the parameters are expected to have one components:
+    sigma of a Gaussian distribution for non-flatness for
+    blaze look-up.
+    '''
+    def __call__(self, parameters):
+        order_selector = OrderSelectorWavy(parameters[0])
+        for e in self.parallels:
+            e.order_selector = order_selector
         return self.elements
 
 
