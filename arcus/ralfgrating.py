@@ -6,6 +6,9 @@ from marxs.base import SimulationSequenceElement
 from marxs.optics import GlobalEnergyFilter, CATGrating
 from marxs.optics.base import OpticalElement
 from marxs.simulator import ParallelCalculated, Parallel
+from marxs.math.utils import norm_vector, h2e, e2h
+from marxs import energy2wave
+
 
 from .load_csv import load_table2d, load_number, load_table
 
@@ -326,12 +329,101 @@ class CATGratingwithL1(CATGrating):
         return catresult
 
 
+class NonParallelCATGrating(CATGratingwithL1):
+    '''CAT Grating where the angle of the reflective wall changes.
+
+    This element represents a CAT grating where not all grating bar walls
+    are perpendicular to the surface of the grating. This is only
+    true for a ray through the center. The angle changes linearly with
+    the distance to the center in the dispersion direction.
+    Each grating bar has a fixed angle, i.e. no change of the direction
+    happens along the grating bars (perpendicular to the dispersion direction).
+
+    Parameters
+    ----------
+    d_blaze_mm : float
+        Change in direction of the reflecting grating bar sidewall, which
+        directly translates to a change in blaze angle [rad / mm].
+    '''
+    def __init__(self, **kwargs):
+        self.d_blaze_mm = kwargs.pop('d_blaze_mm')
+        super(NonParallelCATGrating, self).__init__(**kwargs)
+
+    def blaze_angle_modifier(self, blazeangle, intercoos):
+        '''
+        Parameters
+        ----------
+        blazeangle : np.array
+            Array of blaze angles for photons interacting with optical element
+        intercoos : np.array
+            intercoos coordinates for photons interacting with optical element
+        '''
+        return blazeangle + intercoos[:, 0] * self.d_blaze_mm
+
+    def diffract_photons(self, photons, intersect, interpos, intercoos):
+        '''Except for one line this is copied from marxs.optics.FlatGrating'''
+        p = norm_vector(h2e(photons['dir'].data[intersect]))
+        n = self.geometry('plane')[:3]
+        l = h2e(self.geometry('e_groove'))
+        # Minus sign here because we want n, l, d to be a right-handed coordinate system
+        d = -h2e(self.geometry('e_perp_groove'))
+
+        wave = energy2wave / photons['energy'].data[intersect]
+        # calculate angle between normal and (ray projected in plane perpendicular to groove)
+        # -> this is the blaze angle
+        p_perp_to_grooves = norm_vector(p - np.dot(p, l)[:, np.newaxis] * l)
+        # Use abs here so that blaze angle is always in 0..pi/2
+        # independent of the relative orientation of p and n.
+        blazeangle = np.arccos(np.abs(np.dot(p_perp_to_grooves, n)))
+
+        ### This is the line that was inserted here ###
+        blazeangle = self.blaze_angle_modifier(blazeangle, intercoos[intersect, :])
+
+        m, prob = self.order_selector(photons['energy'].data[intersect],
+                                      photons['polarization'].data[intersect],
+                                      blazeangle)
+
+        # The idea to calculate the components in the (d,l,n) system separately
+        # is taken from MARX
+        sign = self.order_sign_convention(p)
+        p_d = np.dot(p, d) + sign * m * wave / self.d(intercoos[intersect, :])
+        p_l = np.dot(p, l)
+        # The norm for p_n can be derived, but the direction needs to be chosen.
+        p_n = np.sqrt(1. - p_d**2 - p_l**2)
+        # Check if the photons have same direction compared to normal before
+        direction = np.sign(np.dot(p, n), dtype=np.float)
+        if not self.transmission:
+            direction *= -1
+        dir = e2h(p_d[:, None] * d[None, :] + p_l[:, None] * l[None, :] + (direction * p_n)[:, None] * n[None, :], 0)
+
+        return dir, m, prob, blazeangle
+
+
+class GeneralLinearNonParallelCAT(NonParallelCATGrating):
+    def __init__(self, **kwargs):
+        self.blaze_center = kwargs.pop('blaze_center')
+        super(GeneralLinearNonParallelCAT, self).__init__(**kwargs)
+
+    def blaze_angle_modifier(self, blazeangle, intercoos):
+        '''
+        Parameters
+        ----------
+        blazeangle : np.array
+            Array of blaze angles for photons interacting with optical element
+        intercoos : np.array
+            intercoos coordinates for photons interacting with optical element
+        '''
+        return blazeangle + self.blaze_center + intercoos[:, 0] * self.d_blaze_mm
+
+
 class CATWindow(Parallel):
 
     id_col = 'facet'
+    elem_class = CATGratingwithL1
+    extra_elem_args = {'order_selector': globalorderselector}
 
     def __init__(self, **kwargs):
         kwargs['id_col'] = self.id_col
-        kwargs['elem_class'] = CATGratingwithL1
-        kwargs['elem_args']['order_selector'] = globalorderselector
+        kwargs['elem_class'] = self.elem_class
+        kwargs['elem_args'].update(self.extra_elem_args)
         super(CATWindow, self).__init__(**kwargs)
