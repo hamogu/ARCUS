@@ -103,6 +103,7 @@ class ScatterPerChannel(RadialMirrorScatter):
         scattered.
     '''
     display = {'shape': 'None'}
+    loc_coos_name = ['scat_y', 'scat_z']
 
     def __init__(self, **kwargs):
         self.min_id = kwargs.pop('min_id')
@@ -113,6 +114,8 @@ class ScatterPerChannel(RadialMirrorScatter):
                      (photons['xou'] < (self.min_id + 1000)))
         # interpos and intercoos is used to automatically set new position
         # (which we want unaltered, thus we pass pos) and local coords
+        intersect, interpos, intercoos = self.intersect(photons['dir'].data,
+                                                        photons['pos'].data)
         # (which we don't care about, thus we pass zeroth in the right shape.
         return self.process_photons(photons, intersect, photons['pos'].data,
-                                    np.zeros((len(photons), 2)))
+                                    intercoos)
