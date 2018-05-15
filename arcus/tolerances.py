@@ -147,6 +147,17 @@ class WiggleGlobalParallel(ParallelUncertainty):
                                         np.ones(3))
 
 
+class MoveIndividualParallel(ParallelUncertainty):
+    '''Move all elements of a Parallel object in the same way.'''
+    def apply_uncertainty(self, e, parameters):
+        e.elem_uncertainty = [affines.compose(parameters[:3],
+                                             euler.euler2mat(parameters[3],
+                                                             parameters[4],
+                                                             parameters[5], 'sxyz'),
+                                             np.ones(3))
+                              ] * len(e.elements)
+
+
 class PeriodVariation(ParallelUncertainty):
     '''Randomly draw different grating periods for different gratings
 
@@ -189,6 +200,27 @@ class OrderSelectorWavy(InterpolateRalfTable):
         return super(OrderSelectorWavy, self).probabilities(energies, pol, blaze + self.sigma * np.random.randn(len(blaze)))
 
 
+class OrderSelectorTopHat(InterpolateRalfTable):
+    '''Add a random number to blaze angle before looking up Ralf Table
+
+    In the lab, it seems that the grating bars are not exactly
+    perpendicular to the "surface" of the grating. This class adds
+    a random number drawn from a Gaussian distribution to the blaze angle
+    before looking up the grating efficiency and selecting the order.
+
+    Parameters
+    ----------
+    tophatwidth : float
+        width of tophat function (in radian)
+    '''
+    def __init__(self, tophatwidth, **kwargs):
+        self.tophatwidth = tophatwidth
+        super(OrderSelectorTopHat, self).__init__(**kwargs)
+
+    def probabilities(self, energies, pol, blaze):
+        return super(OrderSelectorTopHat, self).probabilities(energies, pol, blaze + self.tophatwidth * (np.random.rand(len(blaze)) - 0.5))
+
+
 class CATFlatnessVariation(ParallelUncertainty):
     '''Randomly draw change from flatness for CAT gratings
 
@@ -199,9 +231,23 @@ class CATFlatnessVariation(ParallelUncertainty):
     and the parameters are expected to have one components:
     sigma of a Gaussian distribution for non-flatness for
     blaze look-up.
+
+    Parameters
+    ----------
+    See `ParallelUncertainty` for an explanation of most parameters.
+
+    orderselector : class
+        This should be a subclass of `InterpolateRalfTable` which determines how
+        the order will be selected. In the case of the default class, the blaze
+        angle of an incoming photons will be modified randomly to represent
+        small-scale deviations from the flatness of the gratings.
     '''
+    def __init__(self, elements, orderselector=OrderSelectorWavy, **kwargs):
+        self.orderselector = orderselector
+        super(CATFlatnessVariation, self).__init__(elements, **kwargs)
+
     def __call__(self, parameters):
-        order_selector = OrderSelectorWavy(parameters[0])
+        order_selector = self.orderselector(parameters[0])
         for e in self.parallels:
             e.order_selector = order_selector
         return self.elements

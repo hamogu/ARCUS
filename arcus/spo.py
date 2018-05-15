@@ -110,12 +110,14 @@ class ScatterPerChannel(RadialMirrorScatter):
         super(ScatterPerChannel, self).__init__(**kwargs)
 
     def __call__(self, photons):
-        intersect = ((photons['xou'] >= self.min_id) &
-                     (photons['xou'] < (self.min_id + 1000)))
-        # interpos and intercoos is used to automatically set new position
+        # interpos is used to automatically set new position
         # (which we want unaltered, thus we pass pos) and local coords
+        # but intercoos we want to set to a useful number for analysis later
         intersect, interpos, intercoos = self.intersect(photons['dir'].data,
                                                         photons['pos'].data)
-        # (which we don't care about, thus we pass zeroth in the right shape.
+        # intersect is done based on xou to avoid problem of overlap
+        # between channels
+        intersect = ((photons['xou'] >= self.min_id) &
+                     (photons['xou'] < (self.min_id + 1000)))
         return self.process_photons(photons, intersect, photons['pos'].data,
                                     intercoos)
