@@ -12,11 +12,10 @@ if not _ASTROPY_SETUP_:
     # For egg_info test builds to pass, put package imports here.
     # from .arcus import *
     import logging
-    import ConfigParser
+    import configparser
     import os
-    from astropy.config import get_config_dir
 
-    confparse = ConfigParser.RawConfigParser({'verbose': 1})
+    confparse = configparser.RawConfigParser({'verbose': 1})
     confs_found = confparse.read(['arcus.cfg',
                                   os.path.expanduser('~/.astropy/config/arcus.cfg')
                         ])
@@ -37,15 +36,15 @@ if not _ASTROPY_SETUP_:
     conf.caldb_inputdata = confparse.get('data', 'caldb_inputdata')
     try:
         conf.verbose = confparse.getint('verbosity', 'verbose')
-    except (ConfigParser.MissingSectionHeaderError, ConfigParser.NoOptionError):
+    except (configparser.MissingSectionHeaderError, configparser.NoOptionError):
         conf.verbose = 1
 
     try:
         conf.logging_level = confparse.get('verbosity', 'logging_level')
-    except (ConfigParser.MissingSectionHeaderError, ConfigParser.NoOptionError):
+    except (configparser.MissingSectionHeaderError, configparser.NoOptionError):
         conf.logging_level = "INFO"
 
     logging.basicConfig(level=conf.logging_level)
     logging.info('Reading configuration data from {}'.format(confs_found))
 
-    from arcus import *
+    from .arcus import *

@@ -2,7 +2,7 @@ from datetime import datetime
 
 from marxs.base import MarxsElement
 from . import version
-from load_csv import get_git_hash, string_git_info
+from .load_csv import get_git_hash, string_git_info
 
 
 class TagVersion(MarxsElement):

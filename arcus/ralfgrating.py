@@ -109,7 +109,7 @@ class RalfQualityFactor(SimulationSequenceElement):
 
     def process_photons(self, photons):
         ind = np.isfinite(photons['order'])
-        photons['probability'][ind] *= np.exp(- (2 * np.pi * self.sigma / self.d)**2)**(photons['order'][ind]**2)
+        photons['probability'][ind] = photons['probability'][ind] * np.exp(- (2 * np.pi * self.sigma / self.d)**2)**(photons['order'][ind]**2)
         return photons
 
 

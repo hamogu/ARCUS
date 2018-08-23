@@ -53,7 +53,7 @@ class PerfectLensSegment(PerfectLens):
     def specific_process_photons(self, photons, intersect, interpos, intercoos):
         # A ray through the center is not broken.
         # So, find out where a central ray would go.
-        p_opt_axis = self.geometry('center') - self.d_center_optax * self.geometry('e_z')
+        p_opt_axis = self.geometry['center'] - self.d_center_optax * self.geometry['e_z']
         focuspoints = h2e(p_opt_axis) + self.focallength * norm_vector(h2e(photons['dir'][intersect]))
         dir = norm_vector(e2h(focuspoints - h2e(interpos[intersect]), 0))
         pol = parallel_transport(photons['dir'].data[intersect, :], dir,
@@ -113,8 +113,8 @@ class ScatterPerChannel(RadialMirrorScatter):
         # interpos is used to automatically set new position
         # (which we want unaltered, thus we pass pos) and local coords
         # but intercoos we want to set to a useful number for analysis later
-        intersect, interpos, intercoos = self.intersect(photons['dir'].data,
-                                                        photons['pos'].data)
+        intersect, interpos, intercoos = self.geometry.intersect(photons['dir'].data,
+                                                                 photons['pos'].data)
         # intersect is done based on xou to avoid problem of overlap
         # between channels
         intersect = ((photons['xou'] >= self.min_id) &

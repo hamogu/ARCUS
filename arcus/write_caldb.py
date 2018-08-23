@@ -48,11 +48,11 @@ def focplane(tagversion={}):
                'YPIX': e.npix[1],
                'XPXL': e.pixsize,
                'YPXL': e.pixsize,
-               'XWIDTH': np.linalg.norm(h2e(e.geometry('v_y'))) * 2,
-               'YWIDTH': np.linalg.norm(h2e(e.geometry('v_z'))) * 2,
-               'FOC0': h2e(e.geometry('center') - e.geometry('v_y') - e.geometry('v_z')),
-               'FOCN': h2e(e.geometry('e_x')),
-               'FOCX': h2e(e.geometry('e_y')),
+               'XWIDTH': np.linalg.norm(h2e(e.geometry['v_y'])) * 2,
+               'YWIDTH': np.linalg.norm(h2e(e.geometry['v_z'])) * 2,
+               'FOC0': h2e(e.geometry['center'] - e.geometry['v_y'] - e.geometry['v_z']),
+               'FOCN': h2e(e.geometry['e_x']),
+               'FOCX': h2e(e.geometry['e_y']),
                'READDIR': '+y',
         }
         if tab is None:
