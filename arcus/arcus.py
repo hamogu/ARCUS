@@ -5,9 +5,11 @@ from scipy.interpolate import interp1d
 import transforms3d
 
 import marxs
-from marxs.simulator import Sequence, KeepCol
+from marxs.simulator import Sequence, KeepCol, Propagator
 from marxs.optics import (GlobalEnergyFilter,
-                          FlatDetector)
+                          FlatDetector,
+                          CircularDetector)
+from marxs.math.geometry import Cylinder
 from marxs import optics
 from marxs.design.rowland import RowlandCircleArray
 import marxs.analysis
@@ -143,8 +145,8 @@ class SimpleSPOs(Sequence):
                                                 inplanescatter=inplanescatter,
                                                 perpplanescatter=perpplanescatter,
                                                 orientation=xyz2zxy[:3, :3]))
-        mirror.append(spo.geometricthroughput)
         mirror.append(spomounting)
+        mirror.append(spo.geometricthroughput)
         super(SimpleSPOs, self).__init__(elements=mirror, **kwargs)
 
 
@@ -238,7 +240,7 @@ class DetCamera(DetMany):
     '''offset of one strip vs the other to avoid matching chip gaps in mm'''
 
     def __init__(self, conf, **kwargs):
-        r = conf['rowland_central'].r
+        r = conf['rowland_detector'].r
         phi_m = np.arcsin(conf['d'] / r) + np.pi
         ccd = self.elem_args['zoom'][1]
         p0 = conf['phi_det_start']
@@ -271,22 +273,6 @@ class DetCamera(DetMany):
         return self.theta
 
 
-class CircularDetector(marxs.optics.CircularDetector):
-    def __init__(self, rowland, name, width=20, **kwargs):
-        # Step 1: Get position and size from Rowland torus
-        pos4d_circ = transforms3d.affines.compose([rowland.R, 0, 0],
-                                                  np.eye(3),
-                                                  [rowland.r, rowland.r, width])
-        # Step 2: Transform to global coordinate system
-        pos4d_circ = np.dot(rowland.pos4d, pos4d_circ)
-        # Step 3: Make detector
-        super(CircularDetector, self).__init__(pos4d=pos4d_circ, phi_offset=-np.pi)
-        self.loc_coos_name = [name + '_phi', name + '_y']
-        self.detpix_name = [name + 'pix_x', name + 'pix_y']
-        self.display = deepcopy(self.display)
-        self.display['opacity'] = 0.1
-
-
 class FocalPlaneDet(marxs.optics.FlatDetector):
     loc_coos_name = ['detfp_x', 'detfp_y']
     detpix_name = ['detfppix_x', 'detfppix_y']
@@ -309,6 +295,9 @@ class PerfectArcus(Sequence):
     (e.g. SIXTE does filters and QE itself).
     '''
 
+    list_of_classes = ['aper_class', 'spo_class', 'gratings_class',
+                       'filter_and_qe_class']
+
     def add_boom(self, conf):
         '''Add four sided boom. Only the top two bays contribute any
         absorption, so we can save time by not modelling the remaining bays.'''
@@ -323,10 +312,17 @@ class PerfectArcus(Sequence):
         detectors need different parameters. Placing this specific code in it's own
         function makes it easy to override for derived classes.
         '''
+        circdet = CircularDetector(geometry=Cylinder.from_rowland(conf['rowland_detector'],
+                                                                  width=20, rotation=np.pi))
+        circdet.display['opacity'] = 0.1
+        circdet.detpix_name = ['circpix_x', 'circpix_y']
+        circproj = marxs.analysis.ProjectOntoPlane(orientation=xyz2zxy[:3, :3])
+        circproj.loc_coos_name = ['projcirc_x', 'projcirc_y']
+        reset = marxs.simulator.simulator.Propagator(distance=-100.)
         twostrips = DetCamera(conf)
         proj = marxs.analysis.ProjectOntoPlane(orientation=xyz2zxy[:3, :3])
         detfp = FocalPlaneDet()
-        return [twostrips, proj, detfp]
+        return [circdet, circproj, reset, twostrips, proj, detfp]
 
     def post_process(self):
         self.KeepPos = KeepCol('pos')
@@ -334,15 +330,13 @@ class PerfectArcus(Sequence):
 
     def __init__(self, conf=defaultconf, channels=['1', '2', '1m', '2m'],
                  **kwargs):
-        list_of_classes = [self.aper_class, self.spo_class,
-                           self.gratings_class, self.filter_and_qe_class]
         elem = []
-        for c in list_of_classes:
-            if c is not None:
-                elem.append(c(conf, channels))
+        for c in self.list_of_classes:
+            cl = getattr(self, c)
+            if cl is not None:
+                elem.append(cl(conf, channels))
         elem.extend(self.add_boom(conf))
         elem.extend(self.add_detectors(conf))
-
         elem.append(tagversion)
         super(PerfectArcus, self).__init__(elements=elem,
                                            postprocess_steps=self.post_process(),
