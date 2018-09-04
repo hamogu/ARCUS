@@ -13,6 +13,7 @@ from marxs.math.geometry import Cylinder
 from marxs import optics
 from marxs.design.rowland import RowlandCircleArray
 import marxs.analysis
+from marxs.design import tolerancing as tol
 
 from .ralfgrating import (InterpolateRalfTable, RalfQualityFactor,
                           catsupportbars, catsupport,
@@ -23,7 +24,6 @@ from .load_csv import load_number, load_table
 from .utils import tagversion
 from .constants import xyz2zxy
 from .generate_rowland import make_rowland_from_d_BF_R_f
-from . import tolerances as tol
 
 __all__ = ['xyz2zxy',
            'jitter_sigma',
@@ -109,11 +109,11 @@ class Aperture(optics.MultiAperture):
             rect = optics.RectangleAperture(position=pos,
                                             zoom=aperzoom,
                                             orientation=xyz2zxy[:3, :3])
+            rect.display['outer_factor'] = 2
             apers.append(rect)
 
         super(Aperture, self).__init__(elements=apers, **kwargs)
-        # Prevent aperture edges from overlapping in plot
-        self.elements[0].display['outer_factor'] = 2
+
 
 
 def spomounting(photons):
@@ -348,13 +348,14 @@ class Arcus(PerfectArcus):
                  **kwargs):
         super(Arcus, self).__init__(conf=conf, channels=channels, **kwargs)
         for row in conf['alignmentbudget']:
+            elem = self.elements_of_class(row[0])
             if row[1] == 'global':
-                wig = tol.WiggleGlobalParallel(self, row[0])
+                tol.moveglobal(elem, *row[3])
             elif row[1] == 'individual':
-                wig = tol.WiggleIndividualElements(self, row[0])
+                tol.wiggle(elem, *row[3])
             else:
                 raise NotImplementedError('Alignment error {} not implemented'.format(row[1]))
-            out = wig(row[3])
+
 
 
 class ArcusForPlot(PerfectArcus):
