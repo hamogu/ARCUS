@@ -122,8 +122,8 @@ def catsupportbars(photons):
     photons['probability'][photons['facet'] < 0] = 0.
     return photons
 
-
-catsupport = GlobalEnergyFilter(filterfunc=lambda e: load_number('gratings', 'L2support', 'transmission'))
+L2relarea = load_number('gratings', 'L2support', 'transmission')
+catsupport = GlobalEnergyFilter(filterfunc=lambda e: L2relarea)
 
 
 class RectangularGrid(ParallelCalculated, OpticalElement):
@@ -300,12 +300,22 @@ l1transmission = interp1d(l1transtab['energy'].to(u.keV, equivalencies=u.spectra
                           l1transtab['transmission'])
 
 
-class CATGratingwithL1(CATGrating):
-    '''Modified CAT grating class
+class CATGratingL1(CATGrating):
+    '''A CAT grating representing only the L1 structure
 
+    This is treated independently of the CAT grating layer itself
+    although the two gratings are not really in the far-field limit.
     CAT gratings of this class determine (statistically) if a photon
     passes through the grating bars or the L1 support.
     The L1 support is simplified as solid Si layer of 4 mu thickness.
+
+    Also, some photons may pass through the CAT grating, but could then be
+    absorbed by the L2 sidewalls. We treat this statistically
+    by reducing the overall probability.
+    I'm ignoring the effect that photons might scatter of the L2
+    sidewall surface (those would be scattered away from the CCDs
+    anyway, and I'm also ignoring high-energy photons that hit a
+    L2 sidewall and then pass through it.
     '''
     l1transmission = l1transmission
 
@@ -326,10 +336,37 @@ class CATGratingwithL1(CATGrating):
         catresult['order'][l1] = 0
         catresult['probability'][l1] = l1transmission(photons['energy'][ind])
 
-        return catresult
+
+class L2(FlatOpticalElement):
+    '''L2 absorption and shadowing
+
+    Some photons may pass through the CAT grating, but could then be
+    absorbed by the L2 sidewalls. We treat this statistically
+    by reducing the overall probability.
+    I'm ignoring the effect that photons might scatter of the L2
+    sidewall surface (those would be scattered away from the CCDs
+    anyway).
+
+    Note that this does not read the L2 from a file, but calcualtes it
+    directly from the dimensions.
+    '''
+    bardepth = 0.5
+    period = 0.916
+    innerfree = 0.866
+
+    def specific_process_photons(self, photons, intersect,
+                                 interpos, intercoos):
+
+        p3 = norm_vector(h2e(photons['dir'].data[intersect]))
+        angle = np.arccos(np.abs(np.dot(p3, self.geometry('plane')[:3])))
+        # Area is filled by L2 bars + area shadowed by L2 bars
+        shadowarea = 3. * (self.period**2 - self.innerfree**2) + 2 * self.innerfree * 0.5 * np.sin(angle)
+        shadowfraction = shadowarea /  (3. * self.period**2)
+
+        return {'probability': shadowfraction}
 
 
-class NonParallelCATGrating(CATGratingwithL1):
+class NonParallelCATGrating(CATGrating):
     '''CAT Grating where the angle of the reflective wall changes.
 
     This element represents a CAT grating where not all grating bar walls
@@ -427,3 +464,11 @@ class CATWindow(Parallel):
         kwargs['elem_class'] = self.elem_class
         kwargs['elem_args'].update(self.extra_elem_args)
         super(CATWindow, self).__init__(**kwargs)
+
+'''Make catwindow contain flatstacks from
+-catgrating
+-L1grating
+-L2
+
+Write L1. Add scatter from diffraction to L2. THat's still missing.
+'''

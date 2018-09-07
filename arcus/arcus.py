@@ -115,7 +115,6 @@ class Aperture(optics.MultiAperture):
         super(Aperture, self).__init__(elements=apers, **kwargs)
 
 
-
 def spomounting(photons):
     '''Remove photons that do not go through an SPO but hit the
     frame part of the petal.'''
