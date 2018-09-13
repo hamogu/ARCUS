@@ -21,7 +21,7 @@ def check_meta_consistent(meta1, meta2):
     of channels is not recorded there) this is necessarily be incomplete.
 
     '''
-    for k in ['CREATOR', 'MARXSVER', 'ARCUSVER', 'ARCDATHA', 'SATELLIT',
+    for k in ['CREATOR', 'MARXSVER', 'ARCUSVER', 'ARCDATGI', 'SATELLIT',
               'COORDSYS', 'RA_PNT', 'DEC_PNT', 'ROLL_PNT',
               'RA_NOM', 'DEC_NOM', 'ROLL_NOM']:
         assert meta1[k] == meta2[k]
