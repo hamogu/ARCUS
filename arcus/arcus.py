@@ -5,7 +5,7 @@ from scipy.interpolate import interp1d
 import transforms3d
 
 import marxs
-from marxs.simulator import Sequence, KeepCol, Propagator
+from marxs.simulator import Sequence, KeepCol
 from marxs.optics import (GlobalEnergyFilter,
                           FlatDetector,
                           CircularDetector)
@@ -315,6 +315,7 @@ class PerfectArcus(Sequence):
                                                                   width=20, rotation=np.pi))
         circdet.display['opacity'] = 0.1
         circdet.detpix_name = ['circpix_x', 'circpix_y']
+        circdet.loc_coos_name = ['circ_phi', 'circ_y']
         circproj = marxs.analysis.ProjectOntoPlane(orientation=xyz2zxy[:3, :3])
         circproj.loc_coos_name = ['projcirc_x', 'projcirc_y']
         reset = marxs.simulator.simulator.Propagator(distance=-100.)

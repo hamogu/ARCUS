@@ -3,10 +3,11 @@ import astropy.units as u
 from scipy.interpolate import RectBivariateSpline, interp1d
 import transforms3d
 from marxs.base import SimulationSequenceElement
-from marxs.optics import GlobalEnergyFilter, CATGrating
-from marxs.optics.base import OpticalElement
-from marxs.simulator import ParallelCalculated, Parallel
+from marxs.optics import (GlobalEnergyFilter, CATGrating, FlatOpticalElement,
+                          OrderSelector, FlatStack)
+from marxs.simulator import Parallel
 from marxs.math.utils import norm_vector, h2e, e2h
+from marxs.optics.scatter import RandomGaussianScatter
 from marxs import energy2wave
 
 
@@ -126,74 +127,6 @@ L2relarea = load_number('gratings', 'L2support', 'transmission')
 catsupport = GlobalEnergyFilter(filterfunc=lambda e: L2relarea)
 
 
-class RectangularGrid(ParallelCalculated, OpticalElement):
-    '''A collection of diffraction gratings on the Rowland torus.
-
-    This class is similar to ``marxs.design.rowland.RectangularGrid`` but
-    uses different axes.
-
-    When initialized, it places elements in the space available on the
-    Rowland circle, most commonly, this class is used to place grating facets.
-
-    After generation, individual facet positions can be adjusted by hand by
-    editing the attributes `elem_pos` or `elem_uncertainty`. See
-    `marxs.simulation.Parallel` for details.
-
-    After any of the `elem_pos`, `elem_uncertainty` or
-    `uncertainty` is changed, `generate_elements` needs to be
-    called to regenerate the facets on the GAS.
-
-    Parameters
-    ----------
-    rowland : RowlandTorus
-    d_element : float
-        Size of the edge of a element, which is assumed to be flat and square.
-        (``d_element`` can be larger than the actual size of the silicon
-        membrane to accommodate a minimum thickness of the surrounding frame.)
-    z_range: list of 2 floats
-        Minimum and maximum of the x coordinate that is searched for an
-        intersection with the torus. A ray can intersect a torus in up to four
-        points. ``x_range`` specififes the range for the numerical search for
-        the intersection point.
-    x_range, y_range: lost of two floats
-        limits of the rectangular area where gratings are placed.
-
-    '''
-
-    id_col = 'facet'
-
-    def __init__(self, **kwargs):
-        self.x_range = kwargs.pop('x_range')
-        self.y_range = kwargs.pop('y_range')
-        self.z_range = kwargs.pop('z_range')
-        self.rowland = kwargs.pop('rowland')
-        self.d_element = kwargs.pop('d_element')
-        kwargs['pos_spec'] = self.elempos
-        if 'parallel_spec' not in kwargs.keys():
-            kwargs['parallel_spec'] = np.array([0., 0., 1., 0.])
-
-        super(RectangularGrid, self).__init__(**kwargs)
-
-    def elempos(self):
-
-        n_x = int(np.ceil((self.x_range[1] - self.x_range[0]) / self.d_element))
-        n_y = int(np.ceil((self.y_range[1] - self.y_range[0]) / self.d_element))
-
-        # n_y and n_z are rounded up, so they cover a slighty larger range than y/z_range
-        width_y = n_y * self.d_element
-        width_x = n_x * self.d_element
-
-        ypos = np.arange(0.5 * (self.y_range[0] - width_y + self.y_range[1] + self.d_element), self.y_range[1], self.d_element)
-        xpos = np.arange(0.5 * (self.x_range[0] - width_x + self.x_range[1] + self.d_element), self.x_range[1], self.d_element)
-        xpos, ypos = np.meshgrid(xpos, ypos)
-
-        zpos = []
-        for x, y in zip(xpos.flatten(), ypos.flatten()):
-            zpos.append(self.rowland.solve_quartic(x=x, y=y, interval=self.z_range))
-
-        return np.vstack([xpos.flatten(), ypos.flatten(), np.array(zpos), np.ones_like(zpos)]).T
-
-
 class CATfromMechanical(Parallel):
     '''A collection of diffraction gratings on the Rowland torus.
 
@@ -276,7 +209,7 @@ class CATfromMechanical(Parallel):
         # which itself is a dict of lists
         # currenty, 'd' is the only parameter passed down that way
         # but e.g. orderselector could be treated the same way
-        kwargs['elem_args']['elem_args'] = [{'d': d} for d in d_grat]
+        # kwargs['elem_args']['elem_args'] = [{'d': d} for d in d_grat]
         kwargs['elem_args']['elem_pos'] = gratingpos
         kwargs['elem_args']['id_num_offset'] = id_start
         super(CATfromMechanical, self).__init__(**kwargs)
@@ -308,20 +241,15 @@ class CATGratingL1(CATGrating):
     CAT gratings of this class determine (statistically) if a photon
     passes through the grating bars or the L1 support.
     The L1 support is simplified as solid Si layer of 4 mu thickness.
-
-    Also, some photons may pass through the CAT grating, but could then be
-    absorbed by the L2 sidewalls. We treat this statistically
-    by reducing the overall probability.
-    I'm ignoring the effect that photons might scatter of the L2
-    sidewall surface (those would be scattered away from the CCDs
-    anyway, and I'm also ignoring high-energy photons that hit a
-    L2 sidewall and then pass through it.
     '''
     l1transmission = l1transmission
 
+    blaze_name = 'blaze_L1'
+    order_name = 'order_L1'
+
     def specific_process_photons(self, photons, intersect,
                                  interpos, intercoos):
-        catresult = super(CATGratingwithL1, self).specific_process_photons(photons, intersect, interpos, intercoos)
+        catresult = super().specific_process_photons(photons, intersect, interpos, intercoos)
 
         # Now select which photons go through the L1 support and
         # set the numbers appropriately.
@@ -333,8 +261,9 @@ class CATGratingL1(CATGrating):
         ind = intersect.nonzero()[0][l1]
         catresult['dir'][l1] = photons['dir'].data[ind, :]
         catresult['polarization'][l1] = photons['polarization'].data[ind, :]
-        catresult['order'][l1] = 0
+        catresult['order_L1'][l1] = 0
         catresult['probability'][l1] = l1transmission(photons['energy'][ind])
+        return catresult
 
 
 class L2(FlatOpticalElement):
@@ -358,12 +287,12 @@ class L2(FlatOpticalElement):
                                  interpos, intercoos):
 
         p3 = norm_vector(h2e(photons['dir'].data[intersect]))
-        angle = np.arccos(np.abs(np.dot(p3, self.geometry('plane')[:3])))
+        angle = np.arccos(np.abs(np.dot(p3, self.geometry['plane'][:3])))
         # Area is filled by L2 bars + area shadowed by L2 bars
         shadowarea = 3. * (self.period**2 - self.innerfree**2) + 2 * self.innerfree * 0.5 * np.sin(angle)
         shadowfraction = shadowarea /  (3. * self.period**2)
 
-        return {'probability': shadowfraction}
+        return {'probability': 1. - shadowfraction}
 
 
 class NonParallelCATGrating(CATGrating):
@@ -414,7 +343,8 @@ class NonParallelCATGrating(CATGrating):
         blazeangle = np.arccos(np.abs(np.dot(p_perp_to_grooves, n)))
 
         ### This is the line that was inserted here ###
-        blazeangle = self.blaze_angle_modifier(blazeangle, intercoos[intersect, :])
+        blazeangle = self.blaze_angle_modifier(blazeangle,
+                                               intercoos[intersect, :])
 
         m, prob = self.order_selector(photons['energy'].data[intersect],
                                       photons['polarization'].data[intersect],
@@ -453,22 +383,47 @@ class GeneralLinearNonParallelCAT(NonParallelCATGrating):
         return blazeangle + self.blaze_center + intercoos[:, 0] * self.d_blaze_mm
 
 
+l1orderselector = OrderSelector(orderlist=np.array([-4, -3, -2, -1, 0,
+                                                    1, 2, 3, 4]),
+                                p=np.array([0.006, 0.0135, 0.022, 0.028, 0.861,
+                                            0.028, 0.022, 0.0135, 0.006]))
+
+
+def l2diffraction(photons, intersect, interpos, intercoos):
+    '''Very simple approximation of L2 diffraction effects.
+
+    L2 is a hexagonal pattern, but at such a large spacing, that diffraction
+    at higher orders can be safely neglected. The only thing that does
+    happen is a slight broadening due to the single-slit function, and again,
+    only the core of that matters. So, we simply approximate this here with
+    simple Gaussian Scattering.
+    '''
+    wave = energy2wave / photons['energy'].data[intersect]
+    sigma = 0.4 * np.arcsin(wave / 0.966)
+    return np.random.normal(size=intersect.sum()) * sigma
+
+
+class CATL1L2Stack(FlatStack):
+    def __init__(self, **kwargs):
+        kwargs['elements'] = [CATGrating,
+                              CATGratingL1,
+                              L2,
+                              RandomGaussianScatter]
+        kwargs['keywords'] = [{'order_selector': globalorderselector,
+                               'd': 0.0002},
+                              {'d': 0.005,
+                               'order_selector': l1orderselector,
+                               'groove_angle': np.pi / 2.},
+                              {},
+                              {'scatter': l2diffraction}]
+        super().__init__(**kwargs)
+
+
 class CATWindow(Parallel):
 
     id_col = 'facet'
-    elem_class = CATGratingwithL1
-    extra_elem_args = {'order_selector': globalorderselector}
 
     def __init__(self, **kwargs):
         kwargs['id_col'] = self.id_col
-        kwargs['elem_class'] = self.elem_class
-        kwargs['elem_args'].update(self.extra_elem_args)
-        super(CATWindow, self).__init__(**kwargs)
-
-'''Make catwindow contain flatstacks from
--catgrating
--L1grating
--L2
-
-Write L1. Add scatter from diffraction to L2. THat's still missing.
-'''
+        kwargs['elem_class'] = CATL1L2Stack
+        super().__init__(**kwargs)
