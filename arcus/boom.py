@@ -7,14 +7,12 @@ from marxs.optics import OpticalElement
 from marxs.math import pluecker
 from marxs.math.utils import h2e, norm_vector
 from marxs.simulator import Parallel
+from marxs.math.geometry import Geometry
 
 
-class Rod(OpticalElement):
-    '''X-axis of the rod is the cylinder axis (x-zoom gives half-length)
-    y zoom and z zoom have to be the same (no elliptical cylinders)
-    '''
-    outcol = 'hitrod'
-    display = {'shape': 'cylinder', 'color': 'black'}
+class Cylinder(Geometry):
+
+    loc_coos_name = ['phi', 'z']
 
     def intersect(self, dir, pos):
         '''Calculate the intersection point between a ray and the element
@@ -37,14 +35,15 @@ class Rod(OpticalElement):
             y and z coordinates in the coordinate system of the active plane.
         '''
         p_rays = pluecker.dir_point2line(h2e(dir), h2e(pos))
-        radius = np.linalg.norm(self.geometry('v_y'))
-        height = np.linalg.norm(self.geometry('v_x'))
+        radius = np.linalg.norm(self.geometry['v_y'])
+        height = np.linalg.norm(self.geometry['v_x'])
         intersect = np.zeros(pos.shape[0], dtype=bool)
 
         # ray passes through cylinder caps?
         for fac in [-1, 1]:
-            cap_midpoint = self.geometry('center') + fac * self.geometry('v_x')
-            cap_plane = pluecker.point_dir2plane(cap_midpoint, self.geometry('e_x'))
+            cap_midpoint = self.geometry['center'] + fac * self.geometry['v_x']
+            cap_plane = pluecker.point_dir2plane(cap_midpoint,
+                                                 self.geometry['e_x'])
             interpos = pluecker.intersect_line_plane(p_rays, cap_plane)
             r = np.linalg.norm(h2e(cap_midpoint) - h2e(interpos), axis=-1)
             intersect[r < radius]  = True
@@ -52,13 +51,23 @@ class Rod(OpticalElement):
         # Ray passes through the side of a cylinder
         # Note that we don't worry about rays parallel to x because those are
         # tested by passing through the caps already
-        n = norm_vector(np.cross(h2e(self.geometry('e_x')), h2e(dir)))
-        d = np.abs(inner1d(n, h2e(self.geometry('center')) - h2e(pos)))
+        n = norm_vector(np.cross(h2e(self.geometry['e_x']), h2e(dir)))
+        d = np.abs(inner1d(n, h2e(self.geometry['center']) - h2e(pos)))
         n2 = norm_vector(np.cross(h2e(dir), n))
-        k = inner1d(h2e(pos) - h2e(self.geometry('center')), n2) / inner1d(h2e(self.geometry('e_x')), n2)
+        k = inner1d(h2e(pos) - h2e(self.geometry['center']), n2) / inner1d(h2e(self.geometry['e_x']), n2)
         intersect[(d < radius) & (np.abs(k) < height)] = True
 
         return intersect, None, None
+
+
+class Rod(OpticalElement):
+    '''X-axis of the rod is the cylinder axis (x-zoom gives half-length)
+    y zoom and z zoom have to be the same (no elliptical cylinders)
+    '''
+    outcol = 'hitrod'
+    display = {'shape': 'cylinder', 'color': 'black'}
+
+    default_geometry = Cylinder
 
     def process_photons(self, photons, intersect, interpos, intercoos):
         if self.outcol not in photons.colnames:

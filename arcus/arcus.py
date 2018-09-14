@@ -357,7 +357,6 @@ class Arcus(PerfectArcus):
                 raise NotImplementedError('Alignment error {} not implemented'.format(row[1]))
 
 
-
 class ArcusForPlot(PerfectArcus):
     '''Arcus with setting that are good for 3D plots
 
