@@ -330,10 +330,10 @@ class NonParallelCATGrating(CATGrating):
     def diffract_photons(self, photons, intersect, interpos, intercoos):
         '''Except for one line this is copied from marxs.optics.FlatGrating'''
         p = norm_vector(h2e(photons['dir'].data[intersect]))
-        n = self.geometry('plane')[:3]
-        l = h2e(self.geometry('e_groove'))
+        n = self.geometry['plane'][:3]
+        l = h2e(self.geometry['e_groove'])
         # Minus sign here because we want n, l, d to be a right-handed coordinate system
-        d = -h2e(self.geometry('e_perp_groove'))
+        d = -h2e(self.geometry['e_perp_groove'])
 
         wave = energy2wave / photons['energy'].data[intersect]
         # calculate angle between normal and (ray projected in plane perpendicular to groove)
