@@ -316,55 +316,14 @@ class NonParallelCATGrating(CATGrating):
         self.d_blaze_mm = kwargs.pop('d_blaze_mm')
         super(NonParallelCATGrating, self).__init__(**kwargs)
 
-    def blaze_angle_modifier(self, blazeangle, intercoos):
+    def blaze_angle_modifier(self, intercoos):
         '''
         Parameters
         ----------
-        blazeangle : np.array
-            Array of blaze angles for photons interacting with optical element
         intercoos : np.array
             intercoos coordinates for photons interacting with optical element
         '''
-        return blazeangle + intercoos[:, 0] * self.d_blaze_mm
-
-    def diffract_photons(self, photons, intersect, interpos, intercoos):
-        '''Except for one line this is copied from marxs.optics.FlatGrating'''
-        p = norm_vector(h2e(photons['dir'].data[intersect]))
-        n = self.geometry['plane'][:3]
-        l = h2e(self.geometry['e_groove'])
-        # Minus sign here because we want n, l, d to be a right-handed coordinate system
-        d = -h2e(self.geometry['e_perp_groove'])
-
-        wave = energy2wave / photons['energy'].data[intersect]
-        # calculate angle between normal and (ray projected in plane perpendicular to groove)
-        # -> this is the blaze angle
-        p_perp_to_grooves = norm_vector(p - np.dot(p, l)[:, np.newaxis] * l)
-        # Use abs here so that blaze angle is always in 0..pi/2
-        # independent of the relative orientation of p and n.
-        blazeangle = np.arccos(np.abs(np.dot(p_perp_to_grooves, n)))
-
-        ### This is the line that was inserted here ###
-        blazeangle = self.blaze_angle_modifier(blazeangle,
-                                               intercoos[intersect, :])
-
-        m, prob = self.order_selector(photons['energy'].data[intersect],
-                                      photons['polarization'].data[intersect],
-                                      blazeangle)
-
-        # The idea to calculate the components in the (d,l,n) system separately
-        # is taken from MARX
-        sign = self.order_sign_convention(p)
-        p_d = np.dot(p, d) + sign * m * wave / self.d(intercoos[intersect, :])
-        p_l = np.dot(p, l)
-        # The norm for p_n can be derived, but the direction needs to be chosen.
-        p_n = np.sqrt(1. - p_d**2 - p_l**2)
-        # Check if the photons have same direction compared to normal before
-        direction = np.sign(np.dot(p, n), dtype=np.float)
-        if not self.transmission:
-            direction *= -1
-        dir = e2h(p_d[:, None] * d[None, :] + p_l[:, None] * l[None, :] + (direction * p_n)[:, None] * n[None, :], 0)
-
-        return dir, m, prob, blazeangle
+        return intercoos[:, 0] * self.d_blaze_mm
 
 
 class GeneralLinearNonParallelCAT(NonParallelCATGrating):
@@ -372,16 +331,14 @@ class GeneralLinearNonParallelCAT(NonParallelCATGrating):
         self.blaze_center = kwargs.pop('blaze_center')
         super(GeneralLinearNonParallelCAT, self).__init__(**kwargs)
 
-    def blaze_angle_modifier(self, blazeangle, intercoos):
+    def blaze_angle_modifier(self, intercoos):
         '''
         Parameters
         ----------
-        blazeangle : np.array
-            Array of blaze angles for photons interacting with optical element
         intercoos : np.array
             intercoos coordinates for photons interacting with optical element
         '''
-        return blazeangle + self.blaze_center + intercoos[:, 0] * self.d_blaze_mm
+        return self.blaze_center + intercoos[:, 0] * self.d_blaze_mm
 
 
 l1orderselector = OrderSelector(orderlist=np.array([-4, -3, -2, -1, 0,
@@ -405,18 +362,21 @@ def l2diffraction(photons, intersect, interpos, intercoos):
 
 
 class CATL1L2Stack(FlatStack):
+    elements = [CATGrating,
+                CATGratingL1,
+                L2,
+                RandomGaussianScatter]
+    keywords = [{'order_selector': globalorderselector,
+                 'd': 0.0002},
+                {'d': 0.005,
+                 'order_selector': l1orderselector,
+                 'groove_angle': np.pi / 2.},
+                {},
+                {'scatter': l2diffraction}]
+
     def __init__(self, **kwargs):
-        kwargs['elements'] = [CATGrating,
-                              CATGratingL1,
-                              L2,
-                              RandomGaussianScatter]
-        kwargs['keywords'] = [{'order_selector': globalorderselector,
-                               'd': 0.0002},
-                              {'d': 0.005,
-                               'order_selector': l1orderselector,
-                               'groove_angle': np.pi / 2.},
-                              {},
-                              {'scatter': l2diffraction}]
+        kwargs['elements'] = self.elements
+        kwargs['keywords'] = self.keywords
         super().__init__(**kwargs)
 
 
