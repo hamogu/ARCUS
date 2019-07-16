@@ -31,7 +31,7 @@ def test_orders_are_focussed(instrument):
     for i in range(-12, 1):
         ind = (photons['order'] == i) & np.isfinite(photons['det_x']) & (photons['probability'] > 0)
         if ind.sum() > 100:
-            assert np.std(photons['det_y'][ind] & (photons['order_L1'] == 0)) < 1
+            assert np.std(photons['det_y'][ind & (photons['order_L1'] == 0)]) < 1
             assert np.std(photons['det_x'][ind]) < 1
             assert np.std(photons['det_x'][ind]) < np.std(photons['det_y'][ind])
             # But make sure that are not focussed too much
