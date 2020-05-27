@@ -182,16 +182,18 @@ class CATfromMechanical(Parallel):
         # but easiest here is to assume that all window numbers are in use
         # That way, we also know that the numbering with id will match.
         # We check numbers with assert.
-        assert set(self.data['SPO_MM_num']) == set(np.arange(self.data['SPO_MM_num'].max() + 1))
-        assert np.all(np.diff(self.data['SPO_MM_num']) >= 0)  # ordered increasing
+        assert np.all(self.data['facet_num'] == np.arange(len(self.data)))
+        assert np.all(np.diff(self.data['facet_num']) == 1)  # ordered increasing
 
         windowpos = []
         gratingpos = []
         id_start = []
         d_grat = []
 
-        for i in np.arange(self.data['SPO_MM_num'].max() + 1):
-            ind = self.data['SPO_MM_num'] == i
+        # Not just "for row in self.data" because in the past we used a format where
+        # the counting started with 1, not 0
+        for i in np.arange(self.data['facet_num'].max() + 1):
+            ind = self.data['facet_num'] == i
             winpos = np.eye(4)
             winpos[:, 3] = pos4d[ind, :, :].mean(axis=0)[:, 3]
             winpos_inv = np.linalg.inv(winpos)

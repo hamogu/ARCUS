@@ -15,8 +15,10 @@ from marxs.math.polarization import parallel_transport
 from .load_csv import load_table2d, load_number, load_table
 from .constants import xyz2zxy
 
-inplanescatter = 10. / 2.3545 / 3600 / 180. * np.pi
-perpplanescatter = 1.5 / 2.345 / 3600. / 180. * np.pi
+# factor 2.3545 converts from FWHM to sigma
+inplanescatter = 7. / 2.3545 / 3600 / 180. * np.pi
+# 2 * 0.68 converts HPD to sigma
+perpplanescatter = 1.5 / (2 * 0.68) / 3600. / 180. * np.pi
 
 focallength = 12000.
 
