@@ -125,8 +125,6 @@ def spomounting(photons):
 class SimpleSPOs(Sequence):
 
     def __init__(self, conf, channels=['1', '2', '1m', '2m'],
-                 inplanescatter=17.4 / 2.3545 / 3600 / 180. * np.pi,
-                 perpplanescatter=1.5 / 2.345 / 3600. / 180. * np.pi,
                  **kwargs):
         rot180 = transforms3d.euler.euler2mat(np.pi, 0, 0, 'szyx')
         # Make lens a little larger than aperture, otherwise an non on-axis ray
@@ -141,8 +139,8 @@ class SimpleSPOs(Sequence):
                                                id_num_offset=id_num_offset[chan]))
             mirror.append(spo.ScatterPerChannel(position=entrancepos,
                                                 min_id=id_num_offset[chan],
-                                                inplanescatter=inplanescatter,
-                                                perpplanescatter=perpplanescatter,
+                                                inplanescatter=spo.inplanescatter,
+                                                perpplanescatter=spo.perpplanescatter,
                                                 orientation=xyz2zxy[:3, :3]))
         mirror.append(spomounting)
         mirror.append(spo.geometricthroughput)

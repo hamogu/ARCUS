@@ -177,23 +177,13 @@ class CATfromMechanical(Parallel):
         kwargs['pos4d'] = np.dot(centerpos, kwargs['pos4d'])
         pos4d = np.array([np.dot(centerpos_inv, p) for p in pos4d])
 
-        # Now get centers for grating windows
-        # could be more clever with binning and unique etc.
-        # but easiest here is to assume that all window numbers are in use
-        # That way, we also know that the numbering with id will match.
-        # We check numbers with assert.
-        assert np.all(self.data['facet_num'] == np.arange(len(self.data)))
-        assert np.all(np.diff(self.data['facet_num']) == 1)  # ordered increasing
-
         windowpos = []
         gratingpos = []
         id_start = []
         d_grat = []
 
-        # Not just "for row in self.data" because in the past we used a format where
-        # the counting started with 1, not 0
-        for i in np.arange(self.data['facet_num'].max() + 1):
-            ind = self.data['facet_num'] == i
+        for i in sorted(set(self.data['SPO_MM_num'])):
+            ind = self.data['SPO_MM_num'] == i
             winpos = np.eye(4)
             winpos[:, 3] = pos4d[ind, :, :].mean(axis=0)[:, 3]
             winpos_inv = np.linalg.inv(winpos)
@@ -298,7 +288,7 @@ class L2(FlatOpticalElement):
         return {'probability': 1. - shadowfraction}
 
 
-class NonParallelCATGrating(CATGrating):
+class GeneralLinearNonParallelCAT(CATGrating):
     '''CAT Grating where the angle of the reflective wall changes.
 
     This element represents a CAT grating where not all grating bar walls
@@ -310,27 +300,15 @@ class NonParallelCATGrating(CATGrating):
 
     Parameters
     ----------
+    blaze_center : float
+        grating bar tilt at center of grating [rad, default=0].
     d_blaze_mm : float
         Change in direction of the reflecting grating bar sidewall, which
-        directly translates to a change in blaze angle [rad / mm].
+        directly translates to a change in blaze angle [rad / mm, default = 0].
     '''
     def __init__(self, **kwargs):
-        self.d_blaze_mm = kwargs.pop('d_blaze_mm')
-        super(NonParallelCATGrating, self).__init__(**kwargs)
-
-    def blaze_angle_modifier(self, intercoos):
-        '''
-        Parameters
-        ----------
-        intercoos : np.array
-            intercoos coordinates for photons interacting with optical element
-        '''
-        return intercoos[:, 0] * self.d_blaze_mm
-
-
-class GeneralLinearNonParallelCAT(NonParallelCATGrating):
-    def __init__(self, **kwargs):
-        self.blaze_center = kwargs.pop('blaze_center')
+        self.d_blaze_mm = kwargs.pop('d_blaze_mm', 0.)
+        self.blaze_center = kwargs.pop('blaze_center', 0.)
         super(GeneralLinearNonParallelCAT, self).__init__(**kwargs)
 
     def blaze_angle_modifier(self, intercoos):
