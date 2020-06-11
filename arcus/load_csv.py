@@ -51,11 +51,12 @@ def log_tab_metadata(dirname, filename, tab):
         if not hash_displayed:
             logging.info('data files in {}: version {}'.format(conf.caldb_inputdata, string_git_info()))
             hash_displayed = True
+    if conf.verbose > 1:
         logging.info('Loading data from {0}/{1}'.format(dirname, filename))
-    if (conf.verbose > 1) and ('keywords' in tab['meta']):
+    if (conf.verbose > 2) and ('keywords' in tab['meta']):
         for k in tab.meta['keywords']:
             logging.info('    {:<15} = {}'.format(k, tab.meta['keywords'][k]))
-    if conf.verbose > 2:
+    if conf.verbose > 3:
         for k in tab.meta:
             if k != 'keywords':
                 logging.info('{}: {}'.format(k, tab.meta[k]))
