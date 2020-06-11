@@ -5,7 +5,7 @@ import glob
 import numpy as np
 from astropy.table import Table
 import astropy.units as u
-from marxs.analysis.gratings import resolvingpower_from_photonlist as respow
+from marxs.analysis.gratings import resolvingpower_from_photonlist
 
 chan_name = ['1', '2', '1m', '2m']
 orders = np.arange(-15, 5)
@@ -113,7 +113,8 @@ def analyse_sim(photons, orders, apertures, reference_meta, conf):
                      (photons['CCD'] >= 0) &
                      (photons['probability'] > 0)]
         zeropos = conf['pos_opt_ax'][chan_name[a]][0]
-        res_a, pos_a, std_a = respow(pa, orders, zeropos=zeropos)
+        res_a, pos_a, std_a = resolvingpower_from_photonlist(pa, orders,
+                                                             zeropos=zeropos)
         res[ia, :] = res_a
 
         if 'circ_phi' in photons.colnames:
@@ -122,8 +123,9 @@ def analyse_sim(photons, orders, apertures, reference_meta, conf):
                          (photons['probability'] > 0)]
             zeropos = np.arcsin((conf['d'] - conf['pos_opt_ax'][chan_name[a]][0]) /
                                 conf['rowland_detector'].r)
-            res_c, pos_c, std_c = respow(pc, orders, col='circ_phi',
-                                     zeropos=zeropos)
+            res_c, pos_c, std_c = resolvingpower_from_photonlist(pc, orders,
+                                                                 col='circ_phi',
+                                                                 zeropos=zeropos)
             res_circ[ia, :] = res_c
         paper = photons[photons['aperture'] == a]
         relaeff[ia, :] = rel_aeff_from_photonlist(paper, orders)
@@ -167,11 +169,13 @@ def aeffRfromraygrid(inpath, aperture, conf, outfile):
     aeff_4 = aeff.sum(axis=1)
     res_4 = np.ma.masked_invalid(np.ma.average(res_clean,
                                                weights=aeff, axis=1))
-    res_disp = np.ma.average(res_4[:, :-1],
-                             weights=np.ma.masked_equal(aeff_4[:, :-1], 0),
+    indnon0 = order != 0
+    res_disp = np.ma.average(res_4[:, indnon0],
+                             weights=np.ma.masked_equal(aeff_4[:, indnon0], 0),
                              axis=1)
+    res_4.fill_value = np.nan  # Columns get filled when writing to fits
     out = Table([energies, wave, res, res_circ, res_clean,
-                 aeff, aeff_4, res_4, res_disp],
+                 aeff, aeff_4, res_4.filled(np.nan), res_disp],
                 names=['energy', 'wave', 'Rccd', 'Rcirc', 'R',
                        'Aeff', 'Aeff4', 'R4', 'R_disp'])
     out['energy'].unit = u.keV
