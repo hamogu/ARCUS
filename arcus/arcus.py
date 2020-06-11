@@ -82,13 +82,13 @@ id_num_offset = {'1': 0,
 
 # Set a little above entrance pos (the mirror) for display purposes.
 # Thus, needs to be geometrically bigger for off-axis sources.
-# with fac > 0.5
-fac = 1.
+# with fac > 0.5 for aligned squares, but more for tilted rectangles
+fac = [1.1, 0.8]
 spopos = np.array(spo.spo_pos4d)
 rmid = 0.5 * (spopos[:, 1, 3].max() + spopos[:, 1, 3].min())
 delta_r = spo.spogeom['outer_radius'] - spo.spogeom['inner_radius']
-rdim = spopos[:, 1, 3].max() - rmid + fac * delta_r.max()
-aperzoom = [1, spopos[:, 0, 3].max() + fac * spo.spogeom['azwidth'].max(),
+rdim = spopos[:, 1, 3].max() - rmid + fac[0] * delta_r.max()
+aperzoom = [1, spopos[:, 0, 3].max() + fac[1] * spo.spogeom['azwidth'].max(),
             rdim
             ]
 
