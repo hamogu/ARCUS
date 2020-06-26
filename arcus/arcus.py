@@ -382,9 +382,9 @@ class ArcusForSIXTE(Arcus):
 
 
 align_requirement_smith = [
-    [spo.SPOChannelMirror, 'individual', [12.5, 100, 50, 300, 300, 10],
+    [spo.SPOChannelMirror, 'individual', [20, 100, 500, 300, 300, 10],
      None, 'individual SPO in petal'],
-    [spo.SPOChannelMirror, 'global', [0., 0, 0, 0, 0, 0],
+    [spo.SPOChannelMirror, 'global', [2000., 800, 800, 180, 180, 180],
      None, 'SPO petal to front assembly'],
     [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600],
      None, 'CAT petal to SPO petal'],
@@ -394,7 +394,7 @@ align_requirement_smith = [
      None, 'individual CAT to window'],
     [DetCamera, 'global', [5000, 2000, 1000, 180, 180, 180],
      None, 'Camera to front assembly']]
-'''This is taken from LSF-CAT-Alignment-v3.xls from R. Smith'''
+'''This is taken from LSF-CAT-Alignment-v17.xls from R. Smith'''
 
 align_requirement = deepcopy(align_requirement_smith)
 reformat_randall_errorbudget(align_requirement)
