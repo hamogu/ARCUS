@@ -100,10 +100,10 @@ def make_rowland_from_d_BF_R_f(d_BF, R, f=11880.):
                                                 orientation=orient),
                 'rowland_central_m': RowlandTorus(R=R, r=r, position=posm,
                                                   orientation=orientm)}
-    geometry['pos_opt_ax'] = {'1': np.array([-d, -7.5, 0., 1]),
-                              '1m': np.array([d, -2.5, 0, 1]),
-                              '2': np.array([-d, +2.5, 0, 1]),
-                              '2m': np.array([d, 7.5, 0, 1])}
+    geometry['pos_opt_ax'] = {'1': np.array([-d - 2.5, -7.5, 0., 1]),
+                              '1m': np.array([d - 2.5, -2.5, 0, 1]),
+                              '2': np.array([-d + 2.5, +2.5, 0, 1]),
+                              '2m': np.array([d + 2.5, 7.5, 0, 1])}
     geometry['pos_det_rowland'] = np.array([-d, 0, 0, 1])
 
     # Now offset that Rowland torus in a z axis by a few mm.
