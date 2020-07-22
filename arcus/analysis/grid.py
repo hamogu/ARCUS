@@ -7,10 +7,6 @@ from astropy.table import Table
 import astropy.units as u
 from marxs.analysis.gratings import resolvingpower_from_photonlist
 
-chan_name = ['1', '2', '1m', '2m']
-orders = np.arange(-15, 5)
-apertures = np.arange(4)
-
 
 def check_meta_consistent(meta1, meta2):
     '''Check that the meta data between two simulations indicates consistency.
@@ -101,9 +97,12 @@ def analyse_sim(photons, orders, apertures, reference_meta, conf):
     '''
     if apertures is None:
         apertures = list(set(photons['aperture']))
+        apertures.sort()
     if reference_meta is not None:
         check_meta_consistent(photons.meta, reference_meta)
     check_energy_consistent(photons)
+
+    chan_name = list(conf['pos_opt_ax'].keys())
 
     res = np.zeros((len(apertures), len(orders)))
     res_circ = np.zeros((len(apertures), len(orders)))
@@ -121,7 +120,8 @@ def analyse_sim(photons, orders, apertures, reference_meta, conf):
             pc = photons[(photons['aperture'] == a) &
                          np.isfinite(photons['circ_phi']) &
                          (photons['probability'] > 0)]
-            zeropos = np.arcsin((conf['d'] - conf['pos_opt_ax'][chan_name[a]][0]) /
+            zeropos = np.arcsin((conf['d'] -
+                                 conf['pos_opt_ax'][chan_name[a]][0]) /
                                 conf['rowland_detector'].r)
             res_c, pos_c, std_c = resolvingpower_from_photonlist(pc, orders,
                                                                  col='circ_phi',
@@ -132,19 +132,24 @@ def analyse_sim(photons, orders, apertures, reference_meta, conf):
     return res, relaeff, res_circ
 
 
-def aeffRfromraygrid(inpath, aperture, conf, outfile):
+def aeffRfromraygrid(inpath, aperture, conf, outfile,
+                     orders=np.arange(-15, 5), apertures=np.arange(4)):
     '''Analyse a grid of simulations for R and Aeff
 
     inpath : string
         Path to the simulations grid
     aperture : `marxs.optics.aperture.BaseAperture`
-        Aperture used for the simulation (the geometric opening error is
+        Aperture used for the simulation (the geometric opening area is
         taken from this)
     conf : dict
         Arcus configuration (the zero order position for each channel
         is taken from this dict).
     outfile : string
         File names to save output table
+    orders : list
+        List of integer order numbers to be analyzed
+    apertures : list
+        List of aperture ids in the simulations
     '''
     rayfiles = glob.glob(os.path.join(inpath, '*.fits'))
     rayfiles.sort()
@@ -156,7 +161,8 @@ def aeffRfromraygrid(inpath, aperture, conf, outfile):
 
     for ifile, rayfile in enumerate(rayfiles):
         obs = Table.read(rayfile)
-        res_i, relaeff_i, res_circ_i = analyse_sim(obs, orders, apertures, r0.meta, conf)
+        res_i, relaeff_i, res_circ_i = analyse_sim(obs, orders, apertures,
+                                                   r0.meta, conf)
         res[ifile, :, :] = res_i
         res_circ[ifile, :, :] = res_circ_i
         aeff[ifile, :, :] = relaeff_i
@@ -169,7 +175,7 @@ def aeffRfromraygrid(inpath, aperture, conf, outfile):
     aeff_4 = aeff.sum(axis=1)
     res_4 = np.ma.masked_invalid(np.ma.average(res_clean,
                                                weights=aeff, axis=1))
-    indnon0 = order != 0
+    indnon0 = orders != 0
     res_disp = np.ma.average(res_4[:, indnon0],
                              weights=np.ma.masked_equal(aeff_4[:, indnon0], 0),
                              axis=1)
@@ -204,6 +210,7 @@ def csv_per_order(infile, col, outfile):
     csv table with one entry per cell.
     '''
     tab = Table.read(infile)
-    outtab = Table(tab[col], names=['order_{0}'.format(o) for o in orders_from_meta(tab.meta)])
+    outtab = Table(tab[col], names=['order_{0}'.format(o) for o
+                                    in orders_from_meta(tab.meta)])
     outtab.add_column(tab['wave'], index=0)
     outtab.write(outfile, format='ascii.csv', overwrite=True)

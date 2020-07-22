@@ -36,6 +36,8 @@ defaultconf['blazeang'] = 1.8
 defaultconf['n_CCDs'] = 16
 defaultconf['phi_det_start'] = 0.037
 
+channels = list(defaultconf['pos_opt_ax'].keys())
+
 
 def reformat_randall_errorbudget(budget, globalfac=0.8):
     '''Reformat the numbers from LSF-CAT-Alignment-v3.xls
@@ -94,7 +96,7 @@ aperzoom = [1, spopos[:, 0, 3].max() + fac[1] * spo.spogeom['azwidth'].max(),
 
 
 class Aperture(optics.MultiAperture):
-    def __init__(self, conf, channels=['1', '2', '1m', '2m'], **kwargs):
+    def __init__(self, conf, channels=channels, **kwargs):
         apers = []
         for chan in channels:
             pos = conf['pos_opt_ax'][chan][:3].copy()
@@ -124,7 +126,7 @@ def spomounting(photons):
 
 class SimpleSPOs(Sequence):
 
-    def __init__(self, conf, channels=['1', '2', '1m', '2m'],
+    def __init__(self, conf, channels=channels,
                  **kwargs):
         rot180 = transforms3d.euler.euler2mat(np.pi, 0, 0, 'szyx')
         # Make lens a little larger than aperture, otherwise an non on-axis ray
@@ -151,7 +153,7 @@ class CATGratings(Sequence):
     order_selector_class = InterpolateRalfTable
     gratquality_class = RalfQualityFactor
 
-    def __init__(self, conf, channels=['1', '2', '1m', '2m'], **kwargs):
+    def __init__(self, conf, channels=channels, **kwargs):
 
         elements = []
 
@@ -233,7 +235,7 @@ class DetCamera(DetMany):
     d_ccd = 2.15
     '''Minimal distance between CCDs in mm'''
 
-    offset = 5.
+    offset = [-5., 5.]
     '''offset of one strip vs the other to avoid matching chip gaps in mm'''
 
     def __init__(self, conf, **kwargs):
@@ -245,13 +247,13 @@ class DetCamera(DetMany):
                          self.d_ccd, self.d_fsupport,
                          self.d_ccd, self.d_ccd])
         theta1 = (p0 + ccd / r) + np.arange(8) * 2 * ccd / r + gaps.cumsum() / r
-        self.theta = np.hstack([phi_m - theta1,
-                                phi_m + self.offset / r + theta1])
+        self.theta = np.hstack([phi_m - theta1 - self.offset[0] / r,
+                                phi_m + self.offset[1] / r + theta1])
         # Sort so that CCD number increases from -x to +x
         self.theta.sort()
         self.theta = self.theta[::-1]
 
-        super(DetCamera, self).__init__(conf, **kwargs)
+        super().__init__(conf, **kwargs)
         assert len(self.elements) == conf['n_CCDs']
         # but make real detectors orange
         disp = deepcopy(self.elements[0].display)
@@ -326,7 +328,7 @@ class PerfectArcus(Sequence):
         self.KeepPos = KeepCol('pos')
         return [self.KeepPos]
 
-    def __init__(self, conf=defaultconf, channels=['1', '2', '1m', '2m'],
+    def __init__(self, conf=defaultconf, channels=channels,
                  **kwargs):
         elem = []
         for c in self.list_of_classes:
@@ -342,7 +344,7 @@ class PerfectArcus(Sequence):
 
 
 class Arcus(PerfectArcus):
-    def __init__(self, conf=defaultconf, channels=['1', '2', '1m', '2m'],
+    def __init__(self, conf=defaultconf, channels=channels,
                  **kwargs):
         super(Arcus, self).__init__(conf=conf, channels=channels, **kwargs)
         for row in conf['alignmentbudget']:
@@ -384,8 +386,16 @@ class ArcusForSIXTE(Arcus):
 align_requirement_smith = [
     [spo.SPOChannelMirror, 'individual', [20, 100, 500, 300, 300, 10],
      None, 'individual SPO in petal'],
-    [spo.SPOChannelMirror, 'global', [2000., 800, 800, 180, 180, 180],
-     None, 'SPO petal to front assembly'],
+    # The following term is for the alignment of each channel
+    # (SPO + CAT petal) relative to the front assembly, i.e. SPO and
+    # CAT petal are moved together.
+    # To make this work, MARXS needs relative position uncertainties
+    # which, at present, are not implemented.
+    # However, these numbers are smaller than "Camera to front assembly"
+    # and for simulations of just one channel would have the same effect.
+    # Thus, neglecting them for now is a only a small contribution.
+    #[spo.SPOChannelMirror, 'global', [2000., 800, 800, 180, 180, 180],
+    # None, 'SPO petal to front assembly'],
     [CATfromMechanical, 'global', [1000, 1000, 1000, 300, 300, 600],
      None, 'CAT petal to SPO petal'],
     [CATfromMechanical, 'individual', [1000, 1000, 200, 300., 180, 300],
