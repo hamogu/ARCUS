@@ -146,6 +146,12 @@ class SimpleSPOs(Sequence):
                                                 orientation=xyz2zxy[:3, :3]))
         mirror.append(spomounting)
         mirror.append(spo.geometricthroughput)
+
+        tab = load_table('spos', 'lossterm')
+        en = tab['energy'].to(u.keV, equivalencies=u.spectral())
+        mirror.append(GlobalEnergyFilter(filterfunc=interp1d(en, tab[tab.colnames[1]]),
+                                         name='Loss_from_nonideal_spos'))
+
         super(SimpleSPOs, self).__init__(elements=mirror, **kwargs)
 
 
