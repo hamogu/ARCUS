@@ -133,8 +133,9 @@ def analyse_sim(photons, orders, apertures, reference_meta, conf):
 
 
 def aeffRfromraygrid(inpath, aperture, conf, outfile,
-                     orders=np.arange(-15, 5), apertures=np.arange(4)):
-    '''Analyse a grid of simulations for R and Aeff
+                     orders=np.arange(-15, 5), apertures=np.arange(4),
+                     allow_inconsistent_meta=False):
+    '''Analyze a grid of simulations for R and Aeff
 
     inpath : string
         Path to the simulations grid
@@ -150,6 +151,10 @@ def aeffRfromraygrid(inpath, aperture, conf, outfile,
         List of integer order numbers to be analyzed
     apertures : list
         List of aperture ids in the simulations
+    allow_inconsistent_meta : bool
+        If ``False`` (the default) the routine checks that all ray files in
+        the grid have compatible meta information (e.g. code version).
+        Setting this to ``True`` bypasses that check.
     '''
     rayfiles = glob.glob(os.path.join(inpath, '*.fits'))
     rayfiles.sort()
@@ -162,7 +167,8 @@ def aeffRfromraygrid(inpath, aperture, conf, outfile,
     for ifile, rayfile in enumerate(rayfiles):
         obs = Table.read(rayfile)
         res_i, relaeff_i, res_circ_i = analyse_sim(obs, orders, apertures,
-                                                   r0.meta, conf)
+                                                   None if allow_inconsistent_meta else r0.meta,
+                                                   conf)
         res[ifile, :, :] = res_i
         res_circ[ifile, :, :] = res_circ_i
         aeff[ifile, :, :] = relaeff_i
