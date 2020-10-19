@@ -41,7 +41,7 @@ for row, ang in zip(spogeom, u.Quantity(spogeom['clocking_angle']).to(u.rad).val
 
 spo_pos4d = [np.dot(xyz2zxy, s) for s in spo_pos4d]
 
-reflectivity = load_table2d('spos', 'reflectivity')
+reflectivity = load_table2d('spos', 'coated_reflectivity')
 reflectivity_interpolator = RectBivariateSpline(reflectivity[1].to(u.keV),
                                                 reflectivity[2].to(u.rad),
                                                 reflectivity[3][0])
