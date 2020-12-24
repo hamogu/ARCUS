@@ -15,8 +15,8 @@ from . import xyz2zxy, jitter_sigma
 coords = SkyCoord(30. * u.deg, 30. * u.deg)
 
 sourcekwargs = {'coords': coords,
-                'energy': 0.5,
-                'flux': 1.
+                'energy': 0.5 * u.keV,
+                'flux': 1. / u.s / u.cm**2
                 }
 pointingkwargs = {'coords': coords,
                   'reference_transform': xyz2zxy,
