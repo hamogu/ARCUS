@@ -32,7 +32,8 @@ def focplane(tagversion={}):
     tagversion = TagVersion(**tagversion)
     det = DetCamera(defaultconf)
 
-    tab = Table(names=['CCDID', 'XPIX', 'YPIX', 'XPXL', 'YPXL', 'XWIDTH', 'YWIDTH',
+    tab = Table(names=['CCDID', 'XPIX', 'YPIX', 'XPXL', 'YPXL',
+                       'XWIDTH', 'YWIDTH',
                        'FOC0', 'FOCN', 'FOCX', 'READDIR'],
                 dtype=[int, int, int, float, float, float, float,
                        '3f4', '3f4', '3f4', 'a2']
@@ -50,15 +51,17 @@ def focplane(tagversion={}):
                'YPXL': e.pixsize,
                'XWIDTH': np.linalg.norm(h2e(e.geometry['v_y'])) * 2,
                'YWIDTH': np.linalg.norm(h2e(e.geometry['v_z'])) * 2,
-               'FOC0': h2e(e.geometry['center'] - e.geometry['v_y'] - e.geometry['v_z']),
+               'FOC0': h2e(e.geometry['center']
+                           - e.geometry['v_y']
+                           - e.geometry['v_z']),
                'FOCN': h2e(e.geometry['e_x']),
                'FOCX': h2e(e.geometry['e_y']),
                'READDIR': '+y',
-        }
+               }
         if tab is None:
-            tab = Table(row) # first row
+            tab = Table(row)  # first row
         else:
-            tab.add_row(row) # later rows
+            tab.add_row(row)  # later rows
     tab.meta['CALTYPE'] = 'FOCPLANE'
     tab.meta['VERSION'] = versionstring()
     tab.meta['INSTRUME'] = 'CCD'
@@ -66,17 +69,19 @@ def focplane(tagversion={}):
     tab.meta['EXTNAME'] = 'CALTYPE'
     tab = tagversion(tab)
     tab.sort('CCDID')
-    tab.write(pjoin(conf.caldb_inputdata, 'fits', 'focplane.fits'), overwrite=True)
+    tab.write(pjoin(conf.caldb_inputdata, 'fits', 'focplane.fits'),
+              overwrite=True)
 
 
 def combine_henke_reflectivity_solid_mirror(pattern, outfile):
     '''Combine tables downloaded from CXRO
 
-    The CXRO website allows only to change one parameter at a time, for example
-    change the energy of a photon for a fixed inclination angle to get the
-    refelctivity. To build up a 2D distribution of reflectivity as a function of
-    energy and angle, several different tables have to be downloaded.
-    This function combines several downloaded files.
+    The CXRO website allows only to change one parameter at a time,
+    for example change the energy of a photon for a fixed inclination
+    angle to get the refelctivity. To build up a 2D distribution of
+    reflectivity as a function of energy and angle, several different
+    tables have to be downloaded.  This function combines several
+    downloaded files.
 
     It only works for files from
     http://henke.lbl.gov/optical_constants/mirror2.html
@@ -89,6 +94,7 @@ def combine_henke_reflectivity_solid_mirror(pattern, outfile):
         pattern for glob with wildcards to identify all input files
     outfile : string
         Filename and path of the output file.
+
     '''
     taball = []
     for filename in glob.iglob(pattern):
@@ -118,11 +124,12 @@ def combine_henke_reflectivity_solid_mirror(pattern, outfile):
 def combine_henke_reflectivity_bilayer_mirror(pattern, outfile):
     '''Combine tables downloaded from CXRO
 
-    The CXRO website allows only to change one parameter at a time, for example
-    change the energy of a photon for a fixed inclination angle to get the
-    refelctivity. To build up a 2D distribution of reflectivity as a function of
-    energy and angle, several different tables have to be downloaded.
-    This function combines several downloaded files.
+    The CXRO website allows only to change one parameter at a time,
+    for example change the energy of a photon for a fixed inclination
+    angle to get the refelctivity. To build up a 2D distribution of
+    reflectivity as a function of energy and angle, several different
+    tables have to be downloaded.  This function combines several
+    downloaded files.
 
     It only works for files from
     http://henke.lbl.gov/optical_constants/bilayer.html
@@ -135,6 +142,7 @@ def combine_henke_reflectivity_bilayer_mirror(pattern, outfile):
         pattern for glob with wildcards to identify all input files
     outfile : string
         Filename and path of the output file.
+
     '''
     taball = []
     for filename in glob.iglob(pattern):

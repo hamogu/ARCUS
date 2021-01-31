@@ -15,8 +15,7 @@ from marxs.design.rowland import RowlandCircleArray
 import marxs.analysis
 from marxs.design import tolerancing as tol
 from marxs.missions.mitsnl.catgrating import catsupportbars
-from .ralfgrating import (globalorderselector,
-                          CATfromMechanical, CATWindow)
+from .ralfgrating import CATfromMechanical, CATWindow
 
 from . import spo
 from . import boom
@@ -371,9 +370,11 @@ class ArcusForPlot(PerfectArcus):
     def add_detectors(self, conf):
         '''Add detectors to the element list
 
-        This is a separate function that is called from __init__ because all
-        detectors need different parameters. Placing this specific code in it's own
-        function makes it easy to override for derived classes.
+        This is a separate function that is called from __init__
+        because all detectors need different parameters. Placing this
+        specific code in it's own function makes it easy to override
+        for derived classes.
+
         '''
         return [DetCamera(conf)]
 

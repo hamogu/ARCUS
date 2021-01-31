@@ -16,9 +16,6 @@ discrete wavelengths points and for each wavelength it has N_PHOT
 photons (where N_PHOT is recorded as a keyword in the meta information
 of the table).
 '''
-
-from __future__ import print_function
-
 import os
 import numpy as np
 from astropy.table import Table
