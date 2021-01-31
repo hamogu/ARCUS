@@ -14,10 +14,10 @@ from marxs import optics
 from marxs.design.rowland import RowlandCircleArray
 import marxs.analysis
 from marxs.design import tolerancing as tol
-
-from .ralfgrating import (InterpolateRalfTable, RalfQualityFactor,
-                          catsupportbars, catsupport,
+from marxs.missions.mitsnl.catgrating import catsupportbars
+from .ralfgrating import (globalorderselector,
                           CATfromMechanical, CATWindow)
+
 from . import spo
 from . import boom
 from .load_csv import load_number, load_table
@@ -156,20 +156,16 @@ class SimpleSPOs(Sequence):
 
 
 class CATGratings(Sequence):
-    order_selector_class = InterpolateRalfTable
-    gratquality_class = RalfQualityFactor
-
     def __init__(self, conf, channels=channels, **kwargs):
 
         elements = []
 
-        self.gratquality = self.gratquality_class()
         for chan in channels:
             elements.append(CATfromMechanical(pos4d=conf['shift_optical_axis_' + chan],
                                               channel=chan, conf=conf,
                                               id_num_offset=id_num_offset[chan],
                                               ))
-        elements.extend([catsupport, catsupportbars, self.gratquality])
+        elements.append(catsupportbars)
         super(CATGratings, self).__init__(elements=elements, **kwargs)
 
 
