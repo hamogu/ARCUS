@@ -20,7 +20,7 @@ from .ralfgrating import CATfromMechanical, CATWindow
 from . import spo
 from . import boom
 from .load_csv import load_number, load_table
-from .utils import tagversion
+from ..utils import tagversion
 from .constants import xyz2zxy
 from .generate_rowland import make_rowland_from_d_BF_R_f
 

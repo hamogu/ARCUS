@@ -10,7 +10,7 @@ scripts in sync to all use the same parameters.
 from marxs.source import PointSource, JitterPointing
 import astropy.units as u
 from astropy.coordinates import SkyCoord
-from . import xyz2zxy, jitter_sigma
+from .instrument.arcus import xyz2zxy, jitter_sigma
 
 coords = SkyCoord(30. * u.deg, 30. * u.deg)
 
@@ -35,8 +35,8 @@ class DefaultSource(PointSource):
     ----------
     Set any parameters that the base class would accept. Parameters are
     passed right through, the only difference in behaviour to the base class is
-    that defaults are provided for all required parameters (e.g. the coordiantes
-    on the sky).
+    that defaults are provided for all required parameters (e.g. the
+    coordiantes on the sky).
     '''
     def __init__(self, **kwargs):
         for k in sourcekwargs:

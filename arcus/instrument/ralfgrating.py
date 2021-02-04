@@ -1,28 +1,20 @@
 import os
 
 import numpy as np
-import astropy.units as u
-from scipy.interpolate import RectBivariateSpline, interp1d
 import transforms3d
-from marxs.base import SimulationSequenceElement
-from marxs.optics import (GlobalEnergyFilter, CATGrating, FlatOpticalElement,
-                          OrderSelector, FlatStack,
-                          OpticalElement)
+from marxs.optics import OpticalElement
 from marxs.simulator import Parallel, ParallelCalculated
-from marxs.math.utils import norm_vector, h2e, e2h
-from marxs.optics.scatter import RandomGaussianScatter
-from marxs import energy2wave
 from marxs.missions.mitsnl.catgrating import (InterpolateEfficiencyTable,
-                                              CATL1L2Stack,
-                                              catsupportbars)
+                                              CATL1L2Stack)
 
 
 from .load_csv import load_table
-from . import conf
+from .. import config
 
 
 globalorderselector = InterpolateEfficiencyTable(
-    os.path.join(conf.caldb_inputdata, 'gratings', 'efficiency.csv'))
+    os.path.join(config['data']['caldb_inputdata'],
+                 'gratings', 'efficiency.csv'))
 '''Global instance of an order selector to use in all CAT gratings.
 
 As long as the efficiency table is the same for all CAT gratings, it makes
@@ -93,7 +85,8 @@ class CATfromMechanical(Parallel):
             windowpos.append(winpos)
             id_start.append(kwargs.get('id_num_offset', 0) +
                             self.data['facet_num'][ind][0])
-            grat_pos = [np.dot(winpos_inv, pos4d[j, :, :]) for j in ind.nonzero()[0]]
+            grat_pos = [np.dot(winpos_inv, pos4d[j, :, :])
+                        for j in ind.nonzero()[0]]
             gratingpos.append(grat_pos)
             d_grat.append(list(self.data['period'][ind]))
 
@@ -173,10 +166,16 @@ class RectangularGrid(ParallelCalculated, OpticalElement):
         # n_y and n_z are rounded up, so they cover a slighty larger range than y/z_range
         width_y = n_y * self.d_element
         width_x = n_x * self.d_element
-        ypos = np.arange(0.5 * (self.y_range[0] - width_y + self.y_range[1] + self.d_element), self.y_range[1], self.d_element)
-        xpos = np.arange(0.5 * (self.x_range[0] - width_x + self.x_range[1] + self.d_element), self.x_range[1], self.d_element)
+        ypos = np.arange(0.5 * (self.y_range[0] - width_y +
+                                self.y_range[1] + self.d_element),
+                         self.y_range[1], self.d_element)
+        xpos = np.arange(0.5 * (self.x_range[0] - width_x +
+                                self.x_range[1] + self.d_element),
+                         self.x_range[1], self.d_element)
         xpos, ypos = np.meshgrid(xpos, ypos)
         zpos = []
         for x, y in zip(xpos.flatten(), ypos.flatten()):
-            zpos.append(self.rowland.solve_quartic(x=x, y=y, interval=self.z_range))
-        return np.vstack([xpos.flatten(), ypos.flatten(), np.array(zpos), np.ones_like(zpos)]).T
+            zpos.append(self.rowland.solve_quartic(x=x, y=y,
+                                                   interval=self.z_range))
+        return np.vstack([xpos.flatten(), ypos.flatten(), np.array(zpos),
+                          np.ones_like(zpos)]).T

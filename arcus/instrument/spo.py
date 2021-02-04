@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from transforms3d.euler import euler2mat
 from transforms3d.affines import compose
@@ -11,12 +12,14 @@ from marxs.optics import (PerfectLens, GlobalEnergyFilter,
 from marxs.simulator import Parallel
 from marxs.math.utils import e2h, h2e, norm_vector
 from marxs.math.polarization import parallel_transport
+from marxs.missions.mitsnl.catgrating import load_table2d
 
-from .load_csv import load_table2d, load_number, load_table
+from .load_csv import load_number, load_table
 from .constants import xyz2zxy
+from .. import config
 
 # factor 2.3545 converts from FWHM to sigma
-perpplanescatter = 1.5 / 2.3545  * u.arcsec
+perpplanescatter = 1.5 / 2.3545 * u.arcsec
 # 2 * 0.68 converts HPD to sigma
 inplanescatter = 7. / (2 * 0.68) * u.arcsec
 
@@ -27,7 +30,8 @@ spogeom = load_table('spos', 'petallayout')
 spogeom['r_mid'] = (spogeom['outer_radius'] + spogeom['inner_radius']) / 2
 spo_pos4d = []
 # Convert angle to quantity here to make sure that unit is taken into account
-for row, ang in zip(spogeom, u.Quantity(spogeom['clocking_angle']).to(u.rad).value):
+for row, ang in zip(spogeom,
+                    u.Quantity(spogeom['clocking_angle']).to(u.rad).value):
     spo_pos4d.append(compose([0,  # focallength,  # - spogeom[i]['d_from_12m']
                               row['r_mid'] * np.sin(ang),
                               row['r_mid'] * np.cos(ang)],
@@ -41,7 +45,8 @@ for row, ang in zip(spogeom, u.Quantity(spogeom['clocking_angle']).to(u.rad).val
 
 spo_pos4d = [np.dot(xyz2zxy, s) for s in spo_pos4d]
 
-reflectivity = load_table2d('spos', 'coated_reflectivity')
+reflectivity = load_table2d(os.path.join(config['data']['caldb_inputdata'],
+                                         'spos', 'coated_reflectivity.csv'))
 reflectivity_interpolator = RectBivariateSpline(reflectivity[1].to(u.keV),
                                                 reflectivity[2].to(u.rad),
                                                 reflectivity[3][0])
