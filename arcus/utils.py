@@ -52,7 +52,8 @@ class TagVersion(MarxsElement):
         photons.meta['INSTRUME'] = ('ARCUSCAM',  'placeholder - no name registered with OGIP')
         photons.meta['FILTER'] = ('NONE', 'filter information')
         photons.meta['GRATING'] = ('ARCUSCAT',  'placeholder - no name registered with OGIP')
-
+        for k, v in kwargs.items():
+            photons.meta[k] = v
         return photons
 
 
