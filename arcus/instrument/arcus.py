@@ -9,7 +9,6 @@ from marxs.simulator import Sequence, KeepCol
 from marxs.optics import (GlobalEnergyFilter,
                           FlatDetector,
                           CircularDetector)
-from marxs.math.geometry import Cylinder
 from marxs import optics
 from marxs.design.rowland import RowlandCircleArray
 import marxs.analysis
@@ -169,6 +168,14 @@ class CATGratings(Sequence):
 
 
 class FiltersAndQE(Sequence):
+    '''
+    Parameters
+    ----------
+    conf, channels : any
+        Parameters are accepted for consistency with other elements in
+        Arcus, but currently, they are not needed here because all relevant
+        settings are hardcoded.
+    '''
 
     filterlist = [('filters', 'sifilter'),
                   ('filters', 'opticalblocking'),
@@ -182,7 +189,7 @@ class FiltersAndQE(Sequence):
         return GlobalEnergyFilter(filterfunc=interp1d(en, tab[tab.colnames[1]]),
                                   name=name)
 
-    def __init__(self, conf, channels, **kwargs):
+    def __init__(self, conf=None, channels=None, **kwargs):
         elems = [self.get_filter(*n) for n in self.filterlist]
         super(FiltersAndQE, self).__init__(elements=elems, **kwargs)
 
@@ -308,12 +315,20 @@ class PerfectArcus(Sequence):
     def add_detectors(self, conf):
         '''Add detectors to the element list
 
-        This is a separate function that is called from __init__ because all
-        detectors need different parameters. Placing this specific code in it's own
-        function makes it easy to override for derived classes.
+        This is a separate function that is called from __init__
+        because all detectors need different parameters. Placing this
+        specific code in it's own function makes it easy to override
+        for derived classes.
+
         '''
-        circdet = CircularDetector(geometry=Cylinder.from_rowland(conf['rowland_detector'],
-                                                                  width=20, rotation=np.pi))
+        # rotatate such that phi=0 is at the bottom
+        rot = transforms3d.axangles.axangle2mat(np.array([0, 1, 0]), np.pi)
+        circdet = CircularDetector(orientation=xyz2zxy[:3, :3] @ rot,
+                                   zoom=[defaultconf['rowland_detector'].r,
+                                         defaultconf['rowland_detector'].r,
+                                         20],
+                                   position=[0, 0, np.sqrt(defaultconf['rowland_detector'].r**2 - conf['d']**2)],
+                                   )
         circdet.display['opacity'] = 0.1
         circdet.detpix_name = ['circpix_x', 'circpix_y']
         circdet.loc_coos_name = ['circ_phi', 'circ_y']
