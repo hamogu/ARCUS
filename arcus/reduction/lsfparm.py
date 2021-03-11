@@ -22,7 +22,7 @@ import astropy.units as u
 from sherpa.models import NormGauss1D, Scale1D
 from sherpa.astro.models import Lorentz1D
 
-from ogip import RMF
+from .ogip import RMF
 
 COPY_LSFPARM_KEYWORDS = [
     # OGIP mantatory
