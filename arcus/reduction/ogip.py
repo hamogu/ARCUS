@@ -85,9 +85,9 @@ def _check_col_and_type(tab, req):
 
 
 class ARF(ColOrKeyTable):
-    required_cols = [('ENERG_LO', (np.float64), 1),
-                     ('ENERG_HI', (np.float64), 1),
-                     ('SPECRESP', (np.float64), 1)]
+    required_cols = [('ENERG_LO', (np.float64,), 1),
+                     ('ENERG_HI', (np.float64,), 1),
+                     ('SPECRESP', (np.float64,), 1)]
 
     def write(self, *args, **kwargs):
         self.meta.update({'EXTNAME': 'SPECRESP',
@@ -100,8 +100,8 @@ class ARF(ColOrKeyTable):
         super().write(*args, **kwargs)
 
     @classmethod
-    def read(*args, **kwargs):
-        self = super().read(*args, **kwargs)
+    def read(cls, *args, **kwargs):
+        self = super().read(*args, format='fits', **kwargs)
         _check_col_and_type(self, self.required_cols)
         return self
 
@@ -118,6 +118,17 @@ class RMF:
     CHANTYPE : 'PHA', 'PI' or None
         If not None, set the CHANTYPE keyword to PHA (should be used if
         possible) or PI. `None` indicates that the CHANTYPE is set already.
+    HDUCLAS3 : 'REDIST', 'DETECTOR', 'FULL' or None
+        Set HDUCLAS3 to the value given. If none, do not set.
+        Allowed values for HDUCLAS3 are:
+           - 'REDIST' for a matrix whose elements represent probabilities
+             associated with the photon redistribution process only
+           - 'DETECTOR' for a matrix whose elements have been multipled by
+             all energy-dependent effects associated with detector
+             (eg detector efficiency, window transmission etc).
+           - 'FULL' for a matrix whose elements have been multipled by all
+             energy-dependent effects associated with detector, optics,
+             collimator, filters etc.
 
     Parameters
     ----------
@@ -137,13 +148,15 @@ class RMF:
                              ('E_MIN', (np.float64,), 1),
                              ('E_MAX', (np.float64,), 1)]
 
-    def __init__(self, matrix, ebounds, CHANTYPE=None):
+    def __init__(self, matrix, ebounds, CHANTYPE=None, HDUCLAS3=None):
         self.matrix = matrix
         self.ebounds = ebounds
         for m in [self.matrix, self.ebounds]:
             m.meta['DETCHANS'] = len(m)
             if CHANTYPE is not None:
                 m.meta['CHANTYPE'] = CHANTYPE
+            if HDUCLAS3 is not None:
+                m.meta['HDUCLAS3'] = HDUCLAS3
         _check_col_and_type(self.matrix, self.matrix_required_cols)
         _check_col_and_type(self.ebounds, self.ebounds_required_cols)
         _check_mandatory_keywords(self.matrix, extra_keywords=['CHANTYPE'])
@@ -184,19 +197,7 @@ class RMF:
         TLMIN : int or `None`
             If `None` then the TLMIN# keywords shoud already be set, if not,
             if is a convenient way to set them on writing.
-
-
-
-        #  Allowed values for HDUCLAS3 are:
-        #    - 'REDIST' for a matrix whose elements represent probabilities
-        #      associated with the photon redistribution process only
-        #    - 'DETECTOR' for a matrix whose elements have been multipled by
-        #      all energy-dependent effects associated with detector
-        #      (eg detector efficiency, window transmission etc).
-        #    - 'FULL' for a matrix whose elements have been multipled by all
-        #      energy-dependent effects associated with detector, optics,
-        #      collimator, filters etc.
-        '''
+       '''
         _check_col_and_type(self.matrix, self.matrix_required_cols)
         _check_col_and_type(self.ebounds, self.ebounds_required_cols)
         matrix_tlmin = 'TLMIN{}'.format(self.matrix.colnames.index('F_CHAN') + 1)

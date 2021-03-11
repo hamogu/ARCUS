@@ -263,6 +263,9 @@ def CALDB_splines(row, **kwargs):
 def sherpa_from_spline(splines, width, wave):
     '''
     To-Do: Convert to correct unit before calling .value
+    To-Do: np.abs is really just there if an interpolation
+      goes below 0. Setting to 0 or linearly interpolating
+      would be better, but I simply want a fast solution right now.
     '''
     model = []
     for col in splines:
@@ -275,14 +278,14 @@ def sherpa_from_spline(splines, width, wave):
         elif gaussn.match(col):
             newg = NormGauss1D(name=col)
             newg.ampl, newg.fwhm, newg.pos = \
-                np.stack([splines[col][i](width.value, wave.value)
-                          for i in [0, 1, 2]]).flatten() * gconv
+                np.abs(np.stack([splines[col][i](width.value, wave.value)
+                          for i in [0, 1, 2]]).flatten() * gconv)
             model.append(newg)
         elif lorentzn.match(col):
             newg = Lorentz1D(name=col)
             newg.ampl, newg.fwhm, newg.pos = \
-                np.stack([splines[col][i](width.value, wave.value)
-                          for i in [0, 1, 2]]).flatten() * gconv
+                np.abs(np.stack([splines[col][i](width.value, wave.value)
+                          for i in [0, 1, 2]]).flatten() * gconv)
             model.append(newg)
 
     sumampl = np.sum([m.ampl.val for m in model
@@ -323,20 +326,24 @@ def make_rmf(lsfparmrow, wave_edges, width, threshold=1e-6, kw_spline={}):
             if k in lsfparmrow.meta:
                 tab.meta[k] = lsfparmrow.meta[k]
 
-    midwave = 0.5 * (matrix['ENERG_LO'].to(u.Angstrom,
-                                           equivalencies=u.spectral()) +
-                     matrix['ENERG_HI'].to(u.Angstrom,
-                                           equivalencies=u.spectral()))
+    ang_lo = matrix['ENERG_HI'].to(u.Angstrom,
+                                   equivalencies=u.spectral())
+    ang_hi = matrix['ENERG_LO'].to(u.Angstrom,
+                                   equivalencies=u.spectral())
+    midwave = 0.5 * (ang_lo + ang_hi)
 
     splines = CALDB_splines(lsfparmrow, **kw_spline)
-    for r, wav in enumerate(reversed(midwave)):
+    for r, wav in enumerate(midwave):
         func = sherpa_from_spline(splines, width, wav)
-        fullmatrix = func(wave_edges[:-1], wave_edges[1:])
-        out = RMF.arr_to_rmf_matrix_row(fullmatrix, 0,
+        # We want sherpa in increasing wavelength, so reverse order
+        fullmatrix = func(ang_lo[::-1], ang_hi[::-1])
+        #print([p.val for p in func.pars])
+        # but then we want the RMF in increasing energy, so we reverse again
+        out = RMF.arr_to_rmf_matrix_row(fullmatrix[::-1], 0,
                                         threshold=threshold)
-        if out[0] > 1:
-            import pdb
-            pdb.set_trace()
+        #if out[0] > 1:
+        #    #import pdb
+        #    #pdb.set_trace()
         for i, col in enumerate(['N_GRP', 'F_CHAN', 'N_CHAN', 'MATRIX']):
             matrix[col][r] = out[i]
-    return RMF(matrix, ebounds, CHANTYPE='PHA')
+    return RMF(matrix, ebounds, CHANTYPE='PHA', HDUCLAS3='REDIST')
