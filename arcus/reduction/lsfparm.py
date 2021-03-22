@@ -239,8 +239,13 @@ def CALDB_splines(row, **kwargs):
             This allows for the same calling signature (width, wave) in
             the code, even if no interpolation over WIDTHS is done because only
             one value is given in the LSFPARM.
+
+            Set s=0 for interpolation, as is the default for the
+            RectBivariateSpline.
             '''
             def __init__(self, x, *args, **kwargs):
+                if 's' not in kwargs.keys():
+                    kwargs['s'] = 0
                 super().__init__(*args, **kwargs)
 
             def __call__(self, x, *args, **kwargs):
