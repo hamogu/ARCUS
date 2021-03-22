@@ -225,7 +225,13 @@ class RMF:
         self.ebounds.meta['HDUCLAS2'] = 'EBOUNDS'
         self.ebounds.meta['HDUVERS'] = '1.2.0'
 
-        self.variable_length_to_fixed_length()
+        # Here I'm assuming that if MATRIX is an object (a list) then
+        # F_CHAN and N_CHAN are also. That's the case when this class
+        # is used ot make them, but might not be true in general if
+        # read in from a file.
+        if self.matrix['MATRIX'].dtype == np.object:
+            self.variable_length_to_fixed_length()
+
         hdulist = fits.HDUList([fits.PrimaryHDU(),
                                 fits.table_to_hdu(self.matrix),
                                 fits.table_to_hdu(self.ebounds)])
@@ -354,11 +360,20 @@ class RMF:
         Until that is fixed, all arrays need to be converted to fixed length
         for writing.
 
-        Note: In many cases, this will only mederately increase the file size
-        but speed up operations significantly.
+        Note: In many cases, this will only moderately increase the file size
+        but speed up operations significantly, so it might be a good idea
+        anyway.
         '''
         m = self.matrix
-        fchan = np.zeros((len(m), np.max(m['N_GRP'])), dtype=np.int16)
+        # int16 is recommended in OGIP, but too small for e.g. Arcus
+        # So, determine smallest inttype that works
+        maxvalf = np.concatenate(m['F_CHAN']).max()
+        maxvaln = np.concatenate(m['N_CHAN']).max()
+        maxval = max(maxvalf, maxvaln)
+        for inttype in [np.int16, np.int32, np.int64]:
+            if inttype(maxval) == maxval:
+                break
+        fchan = np.zeros((len(m), np.max(m['N_GRP'])), dtype=inttype)
         nchan = np.zeros_like(fchan)
         matrix = np.zeros((len(m), max([sum(r) for r in m['N_CHAN']])),
                           dtype=np.float32)
@@ -366,6 +381,8 @@ class RMF:
             fchan[i, :len(r['F_CHAN'])] = r['F_CHAN']
             nchan[i, :len(r['N_CHAN'])] = r['N_CHAN']
             matrix[i, :len(r['MATRIX'])] = r['MATRIX']
-        m['F_CHAN'] = fchan
-        m['N_CHAN'] = nchan
+        # if max(N_GRP) == 1 then we can squueze out the first dimension
+        # and write a number per row instead of an array.
+        m['F_CHAN'] = fchan.squeeze()
+        m['N_CHAN'] = nchan.squeeze()
         m['MATRIX'] = matrix
