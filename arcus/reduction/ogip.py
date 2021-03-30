@@ -97,7 +97,7 @@ class ARF(ColOrKeyTable):
                           'HDUCLAS2': 'SPECRESP',
                           })
         _check_mandatory_keywords(self)
-        super().write(*args, **kwargs)
+        super().write(*args, **kwargs, format='fits')
 
     @classmethod
     def read(cls, *args, **kwargs):
@@ -342,7 +342,7 @@ class RMF:
         '''
         ind = arr > threshold
         # Add False at beginning to end, so that np.diff can be
-        # used to detect changes to and from True, even if the first
+        # used to detect changes to and from True even if the first
         # and / or last value in the row is True
         nfchan = np.diff(np.concatenate(([False], ind, [False]))).nonzero()[0]
         start_end = nfchan.reshape((-1, 2))

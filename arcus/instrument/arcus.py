@@ -175,6 +175,10 @@ class FiltersAndQE(Sequence):
         Parameters are accepted for consistency with other elements in
         Arcus, but currently, they are not needed here because all relevant
         settings are hardcoded.
+    kwargs_interp1d : dict
+        keywords for the filter function, for example to allow values outside
+        the range available in the configuration files:
+        `{'bounds_error'=False}`.
     '''
 
     filterlist = [('filters', 'sifilter'),
@@ -186,10 +190,12 @@ class FiltersAndQE(Sequence):
     def get_filter(self, directory, name):
         tab = load_table(directory, name)
         en = tab['energy'].to(u.keV, equivalencies=u.spectral())
-        return GlobalEnergyFilter(filterfunc=interp1d(en, tab[tab.colnames[1]]),
+        return GlobalEnergyFilter(filterfunc=interp1d(en, tab[tab.colnames[1]],
+                                                      **self.kwargs_interp1d),
                                   name=name)
 
-    def __init__(self, conf=None, channels=None, **kwargs):
+    def __init__(self, conf=None, channels=None, kwargs_interp1d={}, **kwargs):
+        self.kwargs_interp1d = kwargs_interp1d
         elems = [self.get_filter(*n) for n in self.filterlist]
         super(FiltersAndQE, self).__init__(elements=elems, **kwargs)
 

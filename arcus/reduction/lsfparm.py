@@ -16,7 +16,7 @@ import re
 import datetime
 
 import numpy as np
-from scipy.interpolate import RectBivariateSpline, UnivariateSpline
+from scipy import interpolate
 from astropy.table import Column, Table
 import astropy.units as u
 from sherpa.models import NormGauss1D, Scale1D
@@ -41,6 +41,10 @@ gconv = np.array([1, 2 * np.sqrt(2 * np.log(2)), 1])
 lconv = np.array([1, 1, 1])
 
 
+# Is this used anywhere? Usually, do it from spline.
+# Can always convert CALDB to spline and then use that.
+# So I think this is just a second implementation of the same thing
+# which should be be here because now I have to debug etc. twice.
 def caldb2sherpa(caldb, row, iwidth, iwave):
     '''Convert CALDB entries to Sherpa model
 
@@ -173,7 +177,7 @@ def empty_lsfparmtable(widths, waves, model, extname, order):
     tab.meta['CCLS0001'] = 'CPF'
     tab.meta['CDTP0001'] = 'DATA'
     tab.meta['CCNM0001'] = 'LSFPARM'
-    tab.meta['RAND_TG'] =  '0.0'   # make this a parameter
+    tab.meta['RAND_TG'] = '0.0'   # make this a parameter
     tab.meta['LONGSTRN'] = 'OGIP 1.0'
     tab.meta['CREATOR'] = 'lsfparm.py'  # update
     tab.meta['DATE'] = str(datetime.datetime.now()).replace(' ', 'T')[:19],
@@ -219,47 +223,48 @@ def lsfparmtable_add_Chandra_header(tab, evt):
     return tab
 
 
-def CALDB_splines(row, **kwargs):
+class interp1d_2dsignature(interpolate.interp1d):
+    '''1D interp wiht the same signature as `scipy.interpolate.interp2d`
+
+    For use with LSFPARM files that have only one WIDTH.
+
     '''
+    def __init__(self, x, y, z, **kwargs):
+        super().__init__(y, z, **kwargs)
+
+    def __call__(self, x, y):
+        return super().__call__(y)
+
+
+def CALDB_interp(row, kind='cubic', **kwargs):
+    '''Get interpolating functions from values in LSFPARM
+
     Parameters
     ----------
     row : `astropy.table.Row`
         Table row from CALDB LSFPARM file
     **kwargs
         All other keywords arguments are passed to
-        `scipy.interpolate.RectBivariateSpline`.
+        `scipy.interpolate.interp1d` or `scipy.interpolate.interp2d`.
     '''
     interpolators = {}
+
     if row['NUM_WIDTHS'] > 1:
-        Spline = RectBivariateSpline
+        interp = interpolate.interp2d
     else:
-        class Spline(UnivariateSpline):
-            '''UnivariateSpline, but with the signature of RectBivariateSpline
-
-            This allows for the same calling signature (width, wave) in
-            the code, even if no interpolation over WIDTHS is done because only
-            one value is given in the LSFPARM.
-
-            Set s=0 for interpolation, as is the default for the
-            RectBivariateSpline.
-            '''
-            def __init__(self, x, *args, **kwargs):
-                if 's' not in kwargs.keys():
-                    kwargs['s'] = 0
-                super().__init__(*args, **kwargs)
-
-            def __call__(self, x, *args, **kwargs):
-                return super().__call__(*args, **kwargs)
+        interp = interp1d_2dsignature
 
     for col in row.colnames:
         if col == 'EE_FRACS':
-            interpolators[col] = Spline(row['WIDTHS'],
+            interpolators[col] = interp(row['WIDTHS'],
                                         row['LAMBDAS'], row[col],
+                                        kind=kind,
                                         **kwargs)
         elif modelnames.match(col):
-            interpolators[col] = [Spline(row['WIDTHS'],
+            interpolators[col] = [interp(row['WIDTHS'],
                                          row['LAMBDAS'],
-                                         row[col][:, :, i],
+                                         row[col][:, :, i].squeeze(),
+                                         kind=kind,
                                          **kwargs)
                                   for i in [0, 1, 2]]
     return interpolators
@@ -280,18 +285,17 @@ def sherpa_from_spline(splines, width, wave):
             # model is underdetermined if this the ampl of all functions
             # is left free
             eef.c0.frozen = True
-        elif gaussn.match(col):
-            newg = NormGauss1D(name=col)
-            newg.ampl, newg.fwhm, newg.pos = \
+        elif gaussn.match(col) or lorentzn.match(col):
+            if gaussn.match(col):
+                new = NormGauss1D(name=col)
+                conv = gconv
+            else:
+                new = Lorentz1D(name=col)
+                conv = lconv
+            new.ampl, new.fwhm, new.pos = \
                 np.abs(np.stack([splines[col][i](width.value, wave.value)
-                          for i in [0, 1, 2]]).flatten() * gconv)
-            model.append(newg)
-        elif lorentzn.match(col):
-            newg = Lorentz1D(name=col)
-            newg.ampl, newg.fwhm, newg.pos = \
-                np.abs(np.stack([splines[col][i](width.value, wave.value)
-                          for i in [0, 1, 2]]).flatten() * gconv)
-            model.append(newg)
+                          for i in [0, 1, 2]]).flatten() * conv)
+            model.append(new)
 
     sumampl = np.sum([m.ampl.val for m in model
                       if isinstance(m, NormGauss1D) or
@@ -305,7 +309,7 @@ def sherpa_from_spline(splines, width, wave):
     return eef * sum(model[1:], model[0])
 
 
-def make_rmf(lsfparmrow, wave_edges, width, threshold=1e-6, kw_spline={}):
+def make_rmf(lsfparmrow, wave_edges, width, threshold=1e-6, kw_interp={}):
     '''
     makes same number of rows in ebounds extension, although that's
     not required in general
@@ -337,18 +341,14 @@ def make_rmf(lsfparmrow, wave_edges, width, threshold=1e-6, kw_spline={}):
                                    equivalencies=u.spectral())
     midwave = 0.5 * (ang_lo + ang_hi)
 
-    splines = CALDB_splines(lsfparmrow, **kw_spline)
+    splines = CALDB_interp(lsfparmrow, **kw_interp)
     for r, wav in enumerate(midwave):
         func = sherpa_from_spline(splines, width, wav)
         # We want sherpa in increasing wavelength, so reverse order
         fullmatrix = func(ang_lo[::-1], ang_hi[::-1])
-        #print([p.val for p in func.pars])
         # but then we want the RMF in increasing energy, so we reverse again
         out = RMF.arr_to_rmf_matrix_row(fullmatrix[::-1], 0,
                                         threshold=threshold)
-        #if out[0] > 1:
-        #    #import pdb
-        #    #pdb.set_trace()
         for i, col in enumerate(['N_GRP', 'F_CHAN', 'N_CHAN', 'MATRIX']):
             matrix[col][r] = out[i]
     return RMF(matrix, ebounds, CHANTYPE='PHA', HDUCLAS3='REDIST')
