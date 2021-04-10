@@ -311,8 +311,6 @@ def sherpa_from_spline(splines, width, wave):
 
 def make_rmf(lsfparmrow, wave_edges, width, threshold=1e-6, kw_interp={}):
     '''
-    makes same number of rows in ebounds extension, although that's
-    not required in general
     makes PHA channels (because that's what the lsfparm files are made for)
     I made a choice here: writing with TLMIN=0, which is valid OGIP
     '''

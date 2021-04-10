@@ -1,9 +1,9 @@
 from numpy.random import rand, randn
 
-from .ralfgrating import InterpolateRalfTable
+from marxs.missions.mitsnl.catgrating import InterpolateEfficiencyTable
 
 
-class OrderSelectorWavy(InterpolateRalfTable):
+class OrderSelectorWavy(InterpolateEfficiencyTable):
     '''Add a random number to blaze angle before looking up Ralf Table
 
     In the lab, it seems that the grating bars are not exactly
@@ -24,7 +24,7 @@ class OrderSelectorWavy(InterpolateRalfTable):
         return super().probabilities(energies, pol, blaze + self.sigma * randn(len(blaze)))
 
 
-class OrderSelectorTopHat(InterpolateRalfTable):
+class OrderSelectorTopHat(InterpolateEfficiencyTable):
     '''Add a random number to blaze angle before looking up Ralf Table
 
     In the lab, it seems that the grating bars are not exactly

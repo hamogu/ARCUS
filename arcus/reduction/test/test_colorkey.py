@@ -3,7 +3,7 @@ from ..ogip import ColOrKeyTable
 
 import pytest
 
-@pytest.mark.parameterize('input', [3, [3, 3], 3 * np.ones(2, dtype=int)])
+@pytest.mark.parametrize('input', [3, [3, 3], 3 * np.ones(2, dtype=int)])
 def test_insert_allsame(input):
     t = ColOrKeyTable([['text1', 'text2'], [1, 2]], names=['a', 'b'])
     t['c'] = input

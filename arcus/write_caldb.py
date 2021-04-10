@@ -6,9 +6,9 @@ import numpy as np
 from astropy.table import Table, vstack
 import astropy.units as u
 from marxs.math.utils import h2e
-from .arcus import DetCamera, defaultconf
+from .instrument.arcus import DetCamera, defaultconf
 from .utils import TagVersion
-from . import conf
+from . import config
 
 
 def versionstring():
@@ -69,7 +69,7 @@ def focplane(tagversion={}):
     tab.meta['EXTNAME'] = 'CALTYPE'
     tab = tagversion(tab)
     tab.sort('CCDID')
-    tab.write(pjoin(conf.caldb_inputdata, 'fits', 'focplane.fits'),
+    tab.write(pjoin(config['data']['caldb_inputdata'], 'fits', 'focplane.fits'),
               overwrite=True)
 
 

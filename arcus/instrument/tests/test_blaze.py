@@ -1,11 +1,12 @@
 import numpy as np
 from .. import Arcus
-from ..defaults import DefaultSource, DefaultPointing
+from ...defaults import DefaultSource, DefaultPointing
+
 
 def test_blaze():
     '''Check that photons have a reasonable blaze. We do not want to hardocde a
-    particular value here but if they are all zero or they are all over the place
-    then something is probably wrong.
+    particular value here but if they are all zero or they are all over the
+    place then something is probably wrong.
     '''
     s = DefaultSource()
     point = DefaultPointing()

@@ -17,8 +17,9 @@ Try to be lenient in reading, i.e. don't check mandatory keywords.
 Will read files that have the correct columns, even if HDUVER or similar
 keywords are missing. Need to be stricter?
 '''
+from warnings import warn
 import numpy as np
-from astropy.table import Table, Column
+from astropy.table import QTable, Column
 from astropy.io import fits
 import astropy.units as u
 
@@ -40,11 +41,13 @@ class ColOrKeyColumn(Column):
                     del self._parent_table().meta[self.name]
 
 
-class ColOrKeyTable(Table):
+class ColOrKeyTable(QTable):
     Column = ColOrKeyColumn
 
     def __getitem__(self, item):
         if isinstance(item, str) and item in self.meta:
+            if item in self.colnames:
+                warn(f'{item} is both in meta dict and a column.')
             return self.meta[item]
         else:
             return super().__getitem__(item)

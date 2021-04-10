@@ -46,13 +46,17 @@ def filename_from_meta(filetype='fits', **kwargs):
         chan = 'all'  # special case for readability
     filename = f'chan_{chan}'
 
-    if isinstance(kwargs['ORDER'], np.integer):
-        if 'CCDORD' in kwargs:
-            filename += f'_{kwargs["CCDORD"]:+}_confusedby_{kwargs["RFLORDER"]:+}'
-        else:
-            filename += f'_{kwargs["ORDER"]:+}'
+    #  convert to string. Will happen anyway when writing to fits
+    for k in ['ORDER', 'CCDORD', 'RFLORDER']:
+        #  np.integer is not a subclass of int, so need to test both
+        if (k in kwargs) and isinstance(kwargs[k], (int, np.integer)):
+            kwargs[k] = f'{kwargs[k]:+}'
+
+    if 'CCDORD' in kwargs:
+        filename += f'_{kwargs["CCDORD"]}_confusedby_{kwargs["RFLORDER"]}'
     else:
         filename += f'_{kwargs["ORDER"]}'
+
     filename += f'.{filetype}'
     return filename
 

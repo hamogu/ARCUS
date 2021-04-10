@@ -3,7 +3,8 @@ import numpy as np
 from marxs.source import PointSource, FixedPointing
 import astropy.units as u
 from astropy.coordinates import SkyCoord
-from .. import Arcus, xyz2zxy
+from ..constants import xyz2zxy
+from .. import Arcus
 
 import pytest
 

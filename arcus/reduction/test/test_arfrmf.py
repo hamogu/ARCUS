@@ -25,6 +25,12 @@ def test_filename():
                            RFLORDER=-4, CCDORDER=-5)
     assert n == 'root_chan_all_-4_confusedby_-5.fits'
 
+    # After reading a fits file, keywords will be string.
+    # Some may have been modified, so test mixture of int and string
+    n = filename_from_meta(CHANNEL='1111', ORDER='+3',
+                           RFLORDER='-4', CCDORDER=-5)
+    assert n == 'root_chan_all_-4_confusedby_+5.fits'
+
 
 def test_onccd():
     '''Don't want to hardcode exact locations of CCDs in this test,
