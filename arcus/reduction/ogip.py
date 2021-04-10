@@ -54,7 +54,7 @@ class ColOrKeyTable(QTable):
 
     def __setitem__(self, item, value):
         if isinstance(item, str) and (np.ndim(value) == 0 or
-                                      np.all(value == value[0])):
+                                      np.all(np.asanyarray(value) == value[0])):
             if np.ndim(value) == 0:
                 self.meta[item] = value
             else:

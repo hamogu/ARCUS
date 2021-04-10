@@ -1,4 +1,5 @@
 import numpy as np
+import astropy.units as u
 from .. import Arcus
 from ...defaults import DefaultSource, DefaultPointing
 
@@ -10,7 +11,7 @@ def test_blaze():
     '''
     s = DefaultSource()
     point = DefaultPointing()
-    p = s.generate_photons(10000)
+    p = s.generate_photons(10000 * u.s)
     p = point(p)
     arc = Arcus()
     p = arc(p)

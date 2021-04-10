@@ -8,10 +8,10 @@ from .. import Arcus
 
 import pytest
 
-e = 0.5
+e = 0.5 * u.keV
 
 mysource = PointSource(coords=SkyCoord(30. * u.deg, 30. * u.deg),
-                       energy=e, flux=1.)
+                       energy=e)
 mypointing = FixedPointing(coords=SkyCoord(30 * u.deg, 30. * u.deg),
                            reference_transform=xyz2zxy)
 
@@ -25,7 +25,7 @@ def test_orders_are_focussed(instrument):
     changed later, but still check that all light is focused to
     one point to detect error in setting up the mirrors.
     '''
-    photons = mysource.generate_photons(2e4)
+    photons = mysource.generate_photons(2e4 * u.s)
     photons = mypointing(photons)
     photons = instrument(photons)
 
@@ -45,7 +45,7 @@ def test_zeroth_order_and_some_dispersed_orders_are_seen():
     '''test that both the zeroth order and some of the dispersed
     orders are positioned in the detector.
     '''
-    photons = mysource.generate_photons(2e4)
+    photons = mysource.generate_photons(2e4 * u.s)
     photons = mypointing(photons)
     photons = Arcus()(photons)
 
@@ -56,7 +56,7 @@ def test_zeroth_order_and_some_dispersed_orders_are_seen():
 
 def test_two_optical_axes():
     '''Check that there are two position for the zeroth order.'''
-    photons = mysource.generate_photons(1e5)
+    photons = mysource.generate_photons(1e5 * u.s)
     photons = mypointing(photons)
     photons = Arcus()(photons)
     i0 = (photons['order'] == 0) & np.isfinite(photons['det_x']) & (photons['probability'] > 0)
@@ -73,11 +73,12 @@ def test_two_optical_axes():
                           (Arcus(channels=['1m']), 100 * u.cm**2),
                           (Arcus(channels=['2m']), 100 * u.cm**2)])
 def test_effective_area(instrum, expected_area):
-    '''Surely, the effective area of Arcus will eveolve a little when the code is
-    changed to accomendate e.g. a slightly different mounting for the gratings,
-    but if the effective area drops or increases dramatically, that is more likely
-    a sign for a bug in the code.'''
-    photons = mysource.generate_photons(2e4)
+    '''Surely, the effective area of Arcus will eveolve a little when the
+    code is changed to accomendate e.g. a slightly different mounting
+    for the gratings, but if the effective area drops or increases
+    dramatically, that is more likely a sign for a bug in the code.
+    '''
+    photons = mysource.generate_photons(2e4 * u.s)
     photons = mypointing(photons)
     photons = instrum(photons)
     ind = np.isfinite(photons['det_x'])

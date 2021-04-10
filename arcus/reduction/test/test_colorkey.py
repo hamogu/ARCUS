@@ -18,7 +18,7 @@ def test_access_meta_as_column():
     assert t['test'] == 'mytext'
 
 
-def test_existing_col_allsame(input):
+def test_existing_col_allsame():
     t = ColOrKeyTable([['text1', 'text2'], [1, 2]], names=['a', 'b'])
     t['a'] = 'text3'
     assert t.meta['a'] == 'text3'
@@ -26,9 +26,9 @@ def test_existing_col_allsame(input):
     assert t.colnames == ['b']
 
 
-def test_existing_col_allsame_slice(input):
+def test_existing_col_allsame_slice():
     t = ColOrKeyTable([['text1', 'text2'], [1, 2]], names=['a', 'b'])
     t['a'][1] = 'text1'
-    assert t.meta['a'] == 'text3'
-    assert t['a'] == 'text3'
+    assert t.meta['a'] == 'text1'
+    assert t['a'] == 'text1'
     assert t.colnames == ['b']

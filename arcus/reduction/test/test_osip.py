@@ -35,7 +35,7 @@ def test_osip_factor():
     '''test extreme values that do not depend on CCD resolution'''
     assert osip_factor([10] * u.Angstrom, -5, -5, sig_ccd, 0 * u.eV) == 0
     assert np.allclose(osip_factor([10] * u.Angstrom, -5, -5, sig_ccd,
-                                  10 * u.KeV), 1)
+                                  10 * u.keV), 1)
     '''test with fixed sigma'''
     def sig(args):
         return 40 * u.eV

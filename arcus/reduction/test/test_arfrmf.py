@@ -18,18 +18,18 @@ from ..arfrmf import filename_from_meta, onccd
 
 
 def test_filename():
-    n = filename_from_meta('root', 'arf', CHANNEL='1111', ORDER=3)
-    assert n == 'root_chan_all_+3.arf'
+    n = filename_from_meta('arf', ARCCHAN='1111', ORDER=3)
+    assert n == 'chan_all_+3.arf'
 
-    n = filename_from_meta(CHANNEL='1111', ORDER=3,
+    n = filename_from_meta(ARCCHAN='1111', ORDER=3,
                            RFLORDER=-4, CCDORDER=-5)
-    assert n == 'root_chan_all_-4_confusedby_-5.fits'
+    assert n == 'chan_all_-4_confusedby_-5.fits'
 
     # After reading a fits file, keywords will be string.
     # Some may have been modified, so test mixture of int and string
-    n = filename_from_meta(CHANNEL='1111', ORDER='+3',
+    n = filename_from_meta(ARCCHAN='1111', ORDER='+3',
                            RFLORDER='-4', CCDORDER=-5)
-    assert n == 'root_chan_all_-4_confusedby_+5.fits'
+    assert n == 'chan_all_-4_confusedby_+5.fits'
 
 
 def test_onccd():
@@ -42,14 +42,17 @@ def test_onccd():
     assert out.sum() > 0  # Some wavelength fall on chips
     assert out.sum() < len(out)  # but not all of them
 
+    # chip gaps are different for different orders
     out1 = onccd(np.arange(25, 30, .001) * u.Angstrom, -5, '1')
     out2 = onccd(np.arange(25, 30, .001) * u.Angstrom, -6, '1')
-    assert out1 != out2  # chip gaps are different for different orders
+    assert not np.all(out1 == out2)
 
+    # chip gaps are at same position in m * lambda space
     out1 = onccd(np.arange(25, 30, .001) * u.Angstrom, -5, '1')
     out2 = onccd(np.arange(25, 30, .001) * u.Angstrom / 6 * 5, -6, '1')
-    assert out1 == out2  # chip gaps are at same position in m * lambda space
+    assert np.all(out1 == out2)
 
+    # chip gaps are different for different opt ax
     out1 = onccd(np.arange(30, 35, .001) * u.Angstrom, -4, '1')
     out2 = onccd(np.arange(30, 35, .001) * u.Angstrom, -4, '2')
-    assert out1 != out2  # chip gaps are different for different opt ax
+    assert not np.all(out1 == out2)

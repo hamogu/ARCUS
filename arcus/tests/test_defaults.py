@@ -27,7 +27,7 @@ def test_default_source():
     one point to detect error in setting up.
     '''
     instrument = Arcus(channels=['1'])
-    photons = DefaultSource().generate_photons(1e4)
+    photons = DefaultSource().generate_photons(1e4 * u.s)
     photons = DefaultPointing()(photons)
     photons = instrument(photons)
 
@@ -41,11 +41,11 @@ def test_default_source():
 def test_default_source_parameters():
     '''Make sure that parameters are passed through even if they are different
     from defaults.'''
-    s = DefaultSource(energy=0.5)
-    p = s(10)
+    s = DefaultSource(energy=0.5 * u.keV)
+    p = s(10 * u.s)
     assert np.allclose(p['energy'], 0.5)
 
     s = DefaultSource(coords=SkyCoord(30. * u.deg, 0. * u.deg))
-    p = s(10)
+    p = s(10 * u.s)
     p = DefaultPointing()(p)
     assert np.allclose(np.abs(p['dir'][:, 2]), np.cos(np.deg2rad(30)))
