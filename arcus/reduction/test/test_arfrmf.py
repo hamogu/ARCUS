@@ -23,13 +23,18 @@ def test_filename():
 
     n = filename_from_meta(ARCCHAN='1111', ORDER=3,
                            RFLORDER=-4, CCDORDER=-5)
-    assert n == 'chan_all_-4_confusedby_-5.fits'
+    assert n == 'chan_all_extractedorder-4_trueorder-5.fits'
 
     # After reading a fits file, keywords will be string.
     # Some may have been modified, so test mixture of int and string
     n = filename_from_meta(ARCCHAN='1111', ORDER='+3',
                            RFLORDER='-4', CCDORDER=-5)
-    assert n == 'chan_all_-4_confusedby_+5.fits'
+    assert n == 'chan_all_extractedorder-4_trueorder+5.fits'
+
+    # But and order is not confused by itself
+    n = filename_from_meta(ARCCHAN='1111', ORDER=-3,
+                           RFLORDER=-3, CCDORDER=-3)
+    assert n == 'chan_all_extractedorder-3_trueorder-3.fits'
 
 
 def test_onccd():

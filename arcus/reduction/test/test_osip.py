@@ -35,10 +35,20 @@ def test_osip_factor():
     '''test extreme values that do not depend on CCD resolution'''
     assert osip_factor([10] * u.Angstrom, -5, -5, sig_ccd, 0 * u.eV) == 0
     assert np.allclose(osip_factor([10] * u.Angstrom, -5, -5, sig_ccd,
-                                  10 * u.keV), 1)
+                                   10 * u.keV), 1)
     '''test with fixed sigma'''
     def sig(args):
         return 40 * u.eV
 
     assert np.allclose(osip_factor([10] * u.Angstrom, -5, -5, sig,
                                    40 * u.eV), 0.6827, rtol=1e-4)
+
+
+def test_osip_factor_orders_on_different_sides():
+    '''If one order is positive and the other negative, then
+    the signal is diffracted to opposite sides, so there is no
+    contamination.
+    '''
+    assert osip_factor([10] * u.Angstrom, -5, 5, sig_ccd, 0 * u.eV) == 0
+    assert osip_factor([10] * u.Angstrom, 1, -1, sig_ccd, 0 * u.eV) == 0
+    assert osip_factor([10] * u.Angstrom, 1, 0, sig_ccd, 0 * u.eV) == 0

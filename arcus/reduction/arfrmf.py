@@ -47,13 +47,13 @@ def filename_from_meta(filetype='fits', **kwargs):
     filename = f'chan_{chan}'
 
     #  convert to string. Will happen anyway when writing to fits
-    for k in ['ORDER', 'CCDORD', 'RFLORDER']:
+    for k in ['ORDER', 'CCDORDER', 'RFLORDER']:
         #  np.integer is not a subclass of int, so need to test both
         if (k in kwargs) and isinstance(kwargs[k], (int, np.integer)):
             kwargs[k] = f'{kwargs[k]:+}'
 
-    if 'CCDORD' in kwargs:
-        filename += f'_{kwargs["CCDORD"]}_confusedby_{kwargs["RFLORDER"]}'
+    if 'CCDORDER' in kwargs:
+        filename += f'_extractedorder{kwargs["CCDORDER"]}_trueorder{kwargs["RFLORDER"]}'
     else:
         filename += f'_{kwargs["ORDER"]}'
 

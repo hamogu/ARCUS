@@ -75,7 +75,7 @@ class OrderColor():
     def __init__(self, colormap='nipy_spectral', max_order=15):
         import matplotlib.pyplot as plt
         cmap = plt.get_cmap(colormap)
-        self.color = cmap(np.linspace(0, 1, abs(max_order)))
+        self.color = cmap(np.linspace(0, 1, abs(max_order + 1)))
 
     def __call__(self, order):
         kwargs = {}
