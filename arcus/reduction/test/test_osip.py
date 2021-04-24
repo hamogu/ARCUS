@@ -14,41 +14,52 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import astropy.units as u
-from ..osip import osip_factor, sig_ccd
+from ..osip import FixedWidthOSIP, FixedFractionOSIP, FractionalDistanceOSIP
+
+import pytest
+
+osipf = FixedWidthOSIP(40 * u.eV)
+osipp = FixedFractionOSIP(0.7)
+osipd = FractionalDistanceOSIP()
 
 
 def test_osip_factor_width_unit():
     '''check units work for osip_width'''
-    assert np.all(osip_factor([10] * u.Angstrom, -5, -5, sig_ccd, 40 * u.eV) ==
-                  osip_factor([10] * u.Angstrom, -5, -5, sig_ccd, 0.04 * u.keV))
+    osip1 = FixedWidthOSIP(40 * u.eV)
+    osip2 = FixedWidthOSIP(0.04 * u.keV)
+    assert np.all(osip1.osip_factor([10] * u.Angstrom, -5, -5) ==
+                  osip2.osip_factor([10] * u.Angstrom, -5, -5))
 
 
-def test_osip_factor_wave_unit():
+@pytest.mark.parametrize("thisosip", [osipf, osipp, osipd])
+def test_osip_factor_wave_unit(thisosip):
     '''Check input works for wave or energy'''
-    wave = [20] * u.Angstrom
+    wave = [20, 21, 22, 23] * u.Angstrom
     energ = wave.to(u.keV, equivalencies=u.spectral())
-    assert np.all(osip_factor(wave, -5, -5, sig_ccd, 40 * u.eV) ==
-                  osip_factor(energ, -5, -5, sig_ccd, 40 * u.eV))
+    assert np.all(thisosip.osip_factor(wave, -5, -5) ==
+                  thisosip.osip_factor(energ, -5, -5))
 
 
 def test_osip_factor():
     '''test extreme values that do not depend on CCD resolution'''
-    assert osip_factor([10] * u.Angstrom, -5, -5, sig_ccd, 0 * u.eV) == 0
-    assert np.allclose(osip_factor([10] * u.Angstrom, -5, -5, sig_ccd,
-                                   10 * u.keV), 1)
+    assert FixedWidthOSIP(0 * u.eV).osip_factor([10] * u.Angstrom, -5, -5) == 0
+    wide = FixedWidthOSIP(10 * u.keV)
+    assert np.allclose(wide.osip_factor([10] * u.Angstrom, -5, -5), 1)
     '''test with fixed sigma'''
     def sig(args):
         return 40 * u.eV
+    myosip = FixedWidthOSIP(40 * u.eV, sig_ccd=sig)
 
-    assert np.allclose(osip_factor([10] * u.Angstrom, -5, -5, sig,
-                                   40 * u.eV), 0.6827, rtol=1e-4)
+    assert np.allclose(myosip.osip_factor([10] * u.Angstrom, -5, -5),
+                       0.6827, rtol=1e-4)
 
 
-def test_osip_factor_orders_on_different_sides():
+@pytest.mark.parametrize("thisosip", [osipf, osipp, osipd])
+def test_osip_factor_orders_on_different_sides(thisosip):
     '''If one order is positive and the other negative, then
     the signal is diffracted to opposite sides, so there is no
     contamination.
     '''
-    assert osip_factor([10] * u.Angstrom, -5, 5, sig_ccd, 0 * u.eV) == 0
-    assert osip_factor([10] * u.Angstrom, 1, -1, sig_ccd, 0 * u.eV) == 0
-    assert osip_factor([10] * u.Angstrom, 1, 0, sig_ccd, 0 * u.eV) == 0
+    assert thisosip.osip_factor([10] * u.Angstrom, -5, 5) == 0
+    assert thisosip.osip_factor([10] * u.Angstrom, 1, -1) == 0
+    assert thisosip.osip_factor([10] * u.Angstrom, 1, 0) == 0

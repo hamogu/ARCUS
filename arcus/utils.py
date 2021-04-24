@@ -47,8 +47,8 @@ class TagVersion(MarxsElement):
                                   'Institution where file was created')
         photons.meta['CREATOR'] = (self.creator,
                                    'Person or program creating the file')
-        photons.meta['DATE'] = datetime.now().isoformat()[:10]
-        photons.meta['SATELLIT'] = 'ARCUS'
+        photons.meta['DATE'] = (datetime.now().isoformat()[:10], 'Date/time of computation')
+        photons.meta['SATELLIT'] = ('ARCUS', 'placeholder - no name registered with OGIP')
         photons.meta['TELESCOP'] = ('ARCUS', 'placeholder - no name registered with OGIP')
         photons.meta['INSTRUME'] = ('ARCUSCAM',  'placeholder - no name registered with OGIP')
         photons.meta['FILTER'] = ('NONE', 'filter information')
