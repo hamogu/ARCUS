@@ -155,7 +155,7 @@ class OSIPBase(ABC):
 
         arf.meta['INSTRUME'] = f'ORDER_{order}'
         arf.meta['OSIP'] = self.osip_description
-        arf.meta['RFLORDER'] = f'{m}'
+        arf.meta['TRUEORD'] = f'{m}'
         arf.meta['CCDORDER'] = f'{order}'
         # some times there is no overlap and all elements become 0
         if np.all(arf['SPECRESP'] == 0):
@@ -221,7 +221,7 @@ class OSIPBase(ABC):
                         label='__no_legend__')
         ax.set_xlabel(f'$m\\lambda$ [{grid.unit.to_string("latex_inline")}]')
         ax.set_ylabel('CCD energy [keV]')
-        ax.set_xlim([grid.min(), grid.max()])
+        ax.set_xlim([grid.value.min(), grid.value.max()])
         ax.legend()
         ax.set_title('Order sorting regions')
 
@@ -255,7 +255,7 @@ class OSIPBase(ABC):
         ax.set_xlabel(f'$m\\lambda$ [{grid.unit.to_string("latex_inline")}]')
         ax.set_ylabel('Fraction of photons in OSIP')
         ax.set_title(f'Order {order}')
-        ax.set_xlim([grid.min(), grid.max()])
+        ax.set_xlim([grid.value.min(), grid.value.max()])
         ax.set_ylim(0, cm.max() * 1.05)
         ax.legend()
 
@@ -314,7 +314,7 @@ class OSIPBase(ABC):
         outpath : string
             Location where the output ARFs are deposited
         orders : list of int
-            Order numbers to be processed
+            Nominal CCD orders to be processed
         inroot : string
             prefix for input filename
         outroot : string
@@ -325,16 +325,16 @@ class OSIPBase(ABC):
             Overwrite existing files?
         '''
         for order in orders:
-            for t in self. offset_orders:
+            for t in self.offset_orders:
                 # No contamination by zeroth order or by orders on the other
                 # side of the zeroth order
                 if (order + t != 0) and (np.sign(order) == np.sign(order + t)):
                     inputarf = pjoin(inpath, inroot +
                                      arfrmf.filename_from_meta(filetype='arf',
                                                                ARCCHAN=ARCCHAN,
-                                                               ORDER=order))
+                                                               ORDER=order + t))
                     try:
-                        self.apply_osip(inputarf, outpath, order + t,
+                        self.apply_osip(inputarf, outpath, order,
                                         outroot=outroot, overwrite=overwrite)
                     except FileNotFoundError:
                         logger.info(f'Skipping order: {order}, offset: {t} ' +
@@ -420,7 +420,7 @@ class FixedFractionOSIP(OSIPBase):
 
     @u.quantity_input(chan_mid_nominal=u.keV, equivalencies=u.spectral())
     def osip_tab(self, chan_mid_nominal, order):
-        halfwidth = norm.interval(.9)[1] * self.sig_ccd(chan_mid_nominal)
+        halfwidth = norm.interval(self.fraction)[1] * self.sig_ccd(chan_mid_nominal)
         return np.broadcast_to(halfwidth,
                                (2, len(chan_mid_nominal)), subok=True)
 

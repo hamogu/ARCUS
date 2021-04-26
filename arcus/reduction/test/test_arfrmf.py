@@ -14,7 +14,8 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import astropy.units as u
-from ..arfrmf import filename_from_meta, onccd
+from arcus.instrument.arcus import defaultconf
+from ..arfrmf import filename_from_meta, onccd, mkarf, mirr_grat
 
 
 def test_filename():
@@ -22,19 +23,19 @@ def test_filename():
     assert n == 'chan_all_+3.arf'
 
     n = filename_from_meta(ARCCHAN='1111', ORDER=3,
-                           RFLORDER=-4, CCDORDER=-5)
-    assert n == 'chan_all_extractedorder-4_trueorder-5.fits'
+                           TRUEORD=-3, CCDORDER=5)
+    assert n == 'chan_all_ccdord_+5_true_-3.fits'
 
     # After reading a fits file, keywords will be string.
     # Some may have been modified, so test mixture of int and string
     n = filename_from_meta(ARCCHAN='1111', ORDER='+3',
-                           RFLORDER='-4', CCDORDER=-5)
-    assert n == 'chan_all_extractedorder-4_trueorder+5.fits'
+                           TRUEORD='-4', CCDORDER=-5)
+    assert n == 'chan_all_ccdord_-5_true_-4.fits'
 
     # But and order is not confused by itself
     n = filename_from_meta(ARCCHAN='1111', ORDER=-3,
-                           RFLORDER=-3, CCDORDER=-3)
-    assert n == 'chan_all_extractedorder-3_trueorder-3.fits'
+                           TRUEORD=-3, CCDORDER=-3)
+    assert n == 'chan_all_ccdord_-3_true_-3.fits'
 
 
 def test_onccd():
@@ -61,3 +62,33 @@ def test_onccd():
     out1 = onccd(np.arange(30, 35, .001) * u.Angstrom, -4, '1')
     out2 = onccd(np.arange(30, 35, .001) * u.Angstrom, -4, '2')
     assert not np.all(out1 == out2)
+
+
+def test_arf_nonzero():
+    '''Arcus design will evolve, so I don't want to test exact numbers here
+    but if we are off my orders of magnitude that that's likely a code error.
+    '''
+    arf = mkarf([23, 24, 25, 26] * u.Angstrom, -5)
+    assert np.all(arf['SPECRESP'] > 10 * u.cm**2)
+    assert np.all(arf['SPECRESP'] < 400 * u.cm**2)
+
+
+def test_arf_channels_addup():
+    arfall = mkarf([33, 34, 35, 36] * u.Angstrom, -3)
+
+    arflist = []
+    for k in defaultconf['pos_opt_ax'].keys():
+        arflist.append(mkarf([33, 34, 35, 36] * u.Angstrom, -3, channels=[k]))
+
+    assert np.allclose(arfall['SPECRESP'],
+                       sum([a['SPECRESP'] for a in arflist])
+                       )
+
+
+def test_mirrgrat():
+    '''Test that mirr_grat works. Don't want to hardcode specific numbers
+    (since they will change), but test a range here.
+    '''
+    aeff = mirr_grat([10, 20, 30] * u.Angstrom, -5)
+    assert np.all(aeff < [10, 50, 100] * u.cm**2)
+    assert np.all(aeff > [.1, 5., 10.] * u.cm**2)

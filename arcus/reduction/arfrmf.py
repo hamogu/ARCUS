@@ -47,13 +47,13 @@ def filename_from_meta(filetype='fits', **kwargs):
     filename = f'chan_{chan}'
 
     #  convert to string. Will happen anyway when writing to fits
-    for k in ['ORDER', 'CCDORDER', 'RFLORDER']:
+    for k in ['ORDER', 'CCDORDER', 'TRUEORD']:
         #  np.integer is not a subclass of int, so need to test both
         if (k in kwargs) and isinstance(kwargs[k], (int, np.integer)):
             kwargs[k] = f'{kwargs[k]:+}'
 
     if 'CCDORDER' in kwargs:
-        filename += f'_extractedorder{kwargs["CCDORDER"]}_trueorder{kwargs["RFLORDER"]}'
+        filename += f'_ccdord_{kwargs["CCDORDER"]}_true_{kwargs["TRUEORD"]}'
     else:
         filename += f'_{kwargs["ORDER"]}'
 
@@ -137,7 +137,7 @@ onccd = OnCCD(defaultconf)
 class FiltersQE(FiltersAndQE):
     def __call__(self, en_mid):
         # Make it look like a photon table so that I can call MARXS element
-        tab = Table(data=[en_mid, np.ones_like(en_mid)],
+        tab = Table(data=[en_mid, np.ones(len(en_mid))],
                     names=['energy', 'probability'])
         tab = super().__call__(tab)
         return tab['probability']
@@ -155,14 +155,17 @@ class MirrGrat:
     def __init__(self, aefforder=aefforder,
                  kind='quadratic', fill_value=0., bounds_error=False):
         # Bug in astropy <=4.2:
-        # need to warp into extra QTable or sort will fail
+        # need to wrap into extra QTable or sort will fail
         aefforder = QTable(aefforder, copy=True)
         aefforder.sort("wave")
         self.interp = {}
+        self.unit = {}
         for o in aefforder.colnames[1:]:
             self.interp[o] = interp1d(aefforder['wave'], aefforder[o],
                                       kind=kind, fill_value=fill_value,
                                       bounds_error=bounds_error)
+            # interp1d does not conserve unit, so need to keep separately
+            self.unit[o] = aefforder[o].unit
 
     def __call__(self, channel_mid, order):
         '''Mirror and grating efficiency
@@ -185,8 +188,9 @@ class MirrGrat:
         '''
         transmission = self.interp[str(order)](channel_mid.to(u.Angstrom,
                                                equivalencies=u.spectral()))
+
         # Just to prevent unphysical extrapolation
-        return np.clip(transmission, 0, None)
+        return np.clip(transmission, 0, None) * self.unit[str(order)]
 
 
 mirr_grat = MirrGrat(aefforder)
@@ -230,7 +234,7 @@ def mkarf(channel_edges, order,
     specresp_filtqe = trans_filters_qe(en_mid)
     specresp_sim = mirr_grat(en_mid, order)
 
-    all_onccd = np.zeros_like(specresp_filtqe)
+    all_onccd = np.zeros(len(specresp_filtqe))
     for chan in channels:
         if chan not in defaultconf['pos_opt_ax'].keys():
             raise ValueError(f'channel {chan} not defined in Arcus')
@@ -249,9 +253,7 @@ def mkarf(channel_edges, order,
                      'FILTERS_QE', 'ONCCD',
                      # CIAO adds these to grating ARFs, so we do, too:
                      'BIN_LO', 'BIN_HI',
-                     ],
-              units=[u.keV, u.keV, None, None, None, None,
-                     u.Angstrom, u.Angstrom])
+                     ])
     arf.meta['ARCCHAN'] = ''.join(np.isin(list(conf['pos_opt_ax'].keys()),
                                           channels).astype(int).astype(str))
     tagversion(arf, ORDER=order)

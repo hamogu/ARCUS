@@ -18,6 +18,7 @@ from ..osip import FixedWidthOSIP, FixedFractionOSIP, FractionalDistanceOSIP
 
 import pytest
 
+
 osipf = FixedWidthOSIP(40 * u.eV)
 osipp = FixedFractionOSIP(0.7)
 osipd = FractionalDistanceOSIP()
@@ -63,3 +64,12 @@ def test_osip_factor_orders_on_different_sides(thisosip):
     assert thisosip.osip_factor([10] * u.Angstrom, -5, 5) == 0
     assert thisosip.osip_factor([10] * u.Angstrom, 1, -1) == 0
     assert thisosip.osip_factor([10] * u.Angstrom, 1, 0) == 0
+
+
+@pytest.mark.parametrize("thisosip", [osipf, osipp, osipd])
+def test_symmetry(thisosip):
+    '''offset_orders +1 and -1 should have the same OSIP factors
+    if OSIP is symmetric'''
+    up = thisosip.osip_factor([10, 20, 30] * u.Angstrom, -5, -6)
+    down = thisosip.osip_factor([10, 20, 30] * u.Angstrom, -5, -4)
+    assert np.allclose(up, down, atol=1e-4)
