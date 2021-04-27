@@ -261,7 +261,7 @@ class OSIPBase(ABC):
         ax : `matplotlib.axes._subplots.AxesSubplot`
             The axes into which the banana is plotted.
         grid : `~astropy.units.quantity.Quantity`
-            Wavelength grid
+            Wavelength grid in m lambda
         order : int
             Order number
         kwargs :
@@ -270,7 +270,7 @@ class OSIPBase(ABC):
         grid = grid.to(u.Angstrom, equivalencies=u.spectral())
         en = (grid / np.abs(order)).to(u.keV, equivalencies=u.spectral())
 
-        ohw = self.osip_tab(grid, order)
+        ohw = self.osip_tab(en, order)
 
         line = ax.plot(grid, en, label=order, **kwargs)
         ax.fill_between(grid, en - ohw[0, :], en + ohw[1, :],
@@ -290,7 +290,7 @@ class OSIPBase(ABC):
         ax : `matplotlib.axes._subplots.AxesSubplot`
             The axes into which the lines are plotted.
         grid : `~astropy.units.quantity.Quantity`
-            Wavelength grid
+            Wavelength grid in m lambda
         order : int
             Order number
         '''
@@ -322,7 +322,7 @@ class OSIPBase(ABC):
         Parameters
         ----------
         inputarf : string
-            Path to one input ARFs. The energy grid for the plot
+            Path to one input ARF. The energy grid for the plot
             is taken from that ARF.
         outpath : string
             Location where the output ARFs are deposited
@@ -330,17 +330,18 @@ class OSIPBase(ABC):
             prefix for output filename
         '''
         arf = ogip.ARF.read(inputarf)
-        grid = 0.5 * (arf['ENERG_LO'] + arf['ENERG_HI']).to(u.Angstrom,
-                                    equivalencies=u.spectral())
+        bin_mid = 0.5 * (arf['ENERG_LO'] + arf['ENERG_HI'])
+        grid = bin_mid.to(u.Angstrom, equivalencies=u.spectral())
         fig, axes = plt.subplots(ncols=2, figsize=(8, 4))
 
         oc = OrderColor(max_order=np.max(np.abs(orders)))
 
         for order in orders:
-            self.plot_osip(axes[0], grid, order, **oc(order))
+            self.plot_osip(axes[0], grid * abs(arf.meta['ORDER']), order,
+                           **oc(order))
         # pick the middle order for plotting purposes
         o_mid = orders[len(orders) // 2]
-        self.plot_mixture(axes[1], grid, o_mid)
+        self.plot_mixture(axes[1], grid * abs(arf.meta['ORDER']), o_mid)
         fig.subplots_adjust(wspace=.3)
         fig.savefig(pjoin(outpath, outroot + 'OSIP_regions.pdf'),
                     bbox_inches='tight')
@@ -381,6 +382,7 @@ class OSIPBase(ABC):
         overwrite : bool
             Overwrite existing files?
         '''
+        goodarf = None
         for order in orders:
             for t in self.offset_orders:
                 # No contamination by zeroth order or by orders on the other
@@ -393,13 +395,15 @@ class OSIPBase(ABC):
                     try:
                         self.apply_osip(inputarf, outpath, order,
                                         outroot=outroot, overwrite=overwrite)
+                        goodarf = inputarf
                     except FileNotFoundError:
                         logger.info(f'Skipping order: {order}, offset: {t} ' +
                                     'because input arf not found')
                         continue
 
-        if HAS_PLT:
-            self.plot_summary(inputarf, orders, outpath, outroot)
+        # The second condition checks that at least one ARF was written
+        if HAS_PLT and (goodarf is not None):
+            self.plot_summary(goodarf, orders, outpath, outroot)
         self.write_readme(outpath, outroot)
 
 
