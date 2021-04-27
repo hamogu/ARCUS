@@ -23,6 +23,8 @@ from sherpa.models import NormGauss1D
 from arcus import config
 from arcus.instrument.arcus import defaultconf, DetCamera, FiltersAndQE
 from arcus.instrument.load_csv import load_table
+from arcus.instrument.ccd import ccdfwhm
+
 from arcus.utils import TagVersion
 from arcus.reduction.ogip import RMF, ARF
 
@@ -258,12 +260,6 @@ def mkarf(channel_edges, order,
                                           channels).astype(int).astype(str))
     tagversion(arf, ORDER=order)
     return arf
-
-
-ccdfwhm = Table.read(os.path.join(config['data']['caldb_inputdata'],
-                                  'detectors',
-                                  'ccd_2021', 'arcus_ccd_rmf_20210211.txt'),
-                     format='ascii.no_header', names=['energy', 'FWHM'])
 
 
 def mkrmf0(bin_edges, threshold=1e-6, ccdfwhm=ccdfwhm):

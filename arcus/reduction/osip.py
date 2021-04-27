@@ -12,18 +12,18 @@
 #
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+'''This module is developed as part of arcus, but it is of more general use
+and will eventually be moved to a more general package.'''
 from os.path import join as pjoin
 import logging
 import os
 import string
 from abc import ABC
 import numpy as np
-from scipy.stats import norm
-from scipy.interpolate import interp1d
 
 import astropy.units as u
 from astropy.table import Table
-from arcus.reduction import arfrmf, ogip
+from . import arfrmf, ogip
 from arcus.utils import OrderColor
 from arcus.reduction.arfrmf import tagversion
 
@@ -35,33 +35,17 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['sig_ccd', 'OSIPBase',
+__all__ = ['OSIPBase',
            'FixedWidthOSIP', 'FixedFractionOSIP', 'FractionalDistanceOSIP',
            ]
-
-@u.quantity_input(energy=u.keV, equivalencies=u.spectral())
-def sig_ccd(energy):
-    '''Return the Gaussian sigma of the width of the CCD resolution
-
-    Parameters
-    ----------
-    energy : `~astropy.units.quantity.Quantity`
-        True photon energy.
-
-    Returns
-    -------
-    sigma : `~astropy.units.quantity.Quantity`
-        Width of the Gaussian
-    '''
-    return np.interp(energy.to(u.keV, equivalencies=u.spectral()),
-                     arfrmf.ccdfwhm['energy'] * u.keV,
-                     arfrmf.ccdfwhm['FWHM'] * u.eV) / (2 * np.sqrt(2 * np.log(2)))
 
 
 class OSIPBase(ABC):
     '''Modify ARF files to account for order-sorting effects
 
-    This is a base class that implements methods to modify ARF files
+    This is a base class that implements order sorting and integration of
+    the probabilities (OSIP). This includes order-sorting of a photons list
+    (not yet implmented) and  methods to modify ARF files
     to account for order-sorting. Different diffraction orders fall on
     the same physical space on the CCD. The CCD energy resolution can
     then be used to assign photons to specific grating
@@ -69,44 +53,116 @@ class OSIPBase(ABC):
     assingment is not perfect. Some photons may fall outside of the
     nominal energy used for order sorting and thus be lost, other may
     fall onto the energy assgined tothe different order. This class
-    modifies ARF files to correct for that.
+    modifies ARF files to correct for the integrated probability that a photon
+    falls inside the order-sorting region.
+
+    Derived classes should override either `osip_tab` or `osip_range`. The
+    other of the two can alwaus be calculated fron whatever one is given.
 
     Parameters
     ----------
     offset_orders : list of int
         Offset from main order that is relevant.
 
-    sig_ccd : callable
+    ccd_redist : Redistribution object
         Function that return the width the Gaussian sigma of the CCD
         resolution, given an input energy.
+        TODO: Better docs here
     '''
     osip_description = 'Not implemented'
     '''String to be added to FITS header in OSIP keyword for ARFs written.'''
 
-    def __init__(self, offset_orders=[-1, 0, 1], sig_ccd=sig_ccd):
+    def __init__(self, ccd_redist, offset_orders=[-1, 0, 1]):
         self.offset_orders = offset_orders
-        self.sig_ccd = sig_ccd
+        self.ccd_redist = ccd_redist
 
-    @u.quantity_input(chan_mid_nominal=u.keV, equivalencies=u.spectral())
-    def osip_tab(self, chan_mid_nominal, order):
-        raise NotImplementedError
+    @u.quantity_input(chan_mid=u.keV, equivalencies=u.spectral())
+    def osip_tab(self, chan_mid, order) -> u.eV:
+        '''Calculate the boundaries of an order-sorting region
+
+        Parameters
+        ----------
+        energy : `~astropy.units.quantity.Quantity`
+            Energy (or wavelength actually) for which the OSIP should
+            be calculated, e.g. the mid-point of a channel
+        order : int
+            Diffraction order.
+
+        Returns
+        -------
+        osip_tab : `~astropy.units.quantity.Quantity`
+            The shape is an array that contains, for each point in `energy`,
+            the width of the OSIP region, as measured from the nominal
+            energy. If, for example, the energy is 1 keV and ``osip_tab``
+            is `[.1, .2] * u.keV`, then the osip is [.9, 1.2] keV.
+        '''
+        osiprange = self.osip_range(chan_mid, order)
+        osiprange = osiprange.to(u.eV, equivalencies=u.spectral())
+        E = chan_mid.to(u.eV, equivalencies=u.spectral())
+        return E + osiprange * np.array([-1, 1])[:, np.newaxis]
+
+    @u.quantity_input(chan_mid=u.keV, equivalencies=u.spectral())
+    def osip_range(self, chan_mid, order) -> u.eV:
+        '''Calculate the boundaries of an order-sorting region
+
+        This method returns the boundaries of an order-sorting region in
+        energy space.
+        This is very similar to `osip_tab`, which gives the width of the
+        region. Essentially, this method calls `osip_tab` and add the energy
+        so that the result contains the lower and upper bound.
+
+        Parameters
+        ----------
+        chan_mid : `~astropy.units.quantity.Quantity`
+            Energy or wavelength for which the OSIP should
+            be calculated, e.g. the mid-point of a channel
+        order : int
+            Diffraction order.
+
+        Returns
+        -------
+        osip : `~astropy.units.quantity.Quantity`
+            The shape is an array that contains, for each point in `energy`,
+            the lower and upper bound of the OSIP region.
+        '''
+        osiptab = self.osip_tab(chan_mid, order)
+        osiptab = osiptab.to(u.eV, equivalencies=u.spectral())
+        E = chan_mid.to(u.eV, equivalencies=u.spectral())
+        return E + osiptab * np.array([-1, 1])[:, np.newaxis]
 
     @u.quantity_input(chan_mid_nominal=u.keV, equivalencies=u.spectral())
     def osip_factor(self, chan_mid_nominal, o_nominal, o_true):
+        '''Calculate the relative effective area after order sorting.
+
+        This method can be used to calculate a fraction fo
+
+        Parameters
+        ----------
+        chan_mid_nominal : `~astropy.units.quantity.Quantity`
+            Energy or wavelength of the nominal order for which the OSIP should
+            be calculated, e.g. the mid-point of a channel
+        o_nominal : int
+            Nominal diffraction order, i.e. the order that is to be extracted
+            from the CCD.
+        o_true : int
+            True diffracton order.
+
+        Returns
+        -------
+        osip : `~astropy.units.quantity.Quantity`
+            The shape is an array that contains, for each point in `energy`,
+            the lower and upper bound of the OSIP region.
+        '''
+
         if np.sign(o_nominal) != np.sign(o_true):
             return 0.
 
-        osiptab = self.osip_tab(chan_mid_nominal, o_nominal)
-        # Need to exlicitly say if this is in energy or in wavelength space,
-        # so there is a lot to(u.eV) in here
-        osiptab = osiptab.to(u.eV, equivalencies=u.spectral())
-        # dE is distance from the energy of the nominal order
-        dE = chan_mid_nominal.to(u.eV, equivalencies=u.spectral()) * ((o_true / o_nominal) - 1)
-        lower_bound = dE - osiptab[0, :]
-        upper_bound = dE + osiptab[1, :]
-        scale = self.sig_ccd(chan_mid_nominal * o_true / o_nominal).to(u.eV, equivalencies=u.spectral())
-        osip_factor = norm.cdf(upper_bound / scale) - norm.cdf(lower_bound / scale)
-        return osip_factor
+        osiprange = self.osip_range(chan_mid_nominal, o_nominal)
+        Etrue = chan_mid_nominal.to(u.eV, equivalencies=u.spectral()) * \
+            (o_true / o_nominal)
+        upper = self.ccd_redist.cdf(osiprange[1, :], loc=Etrue)
+        lower = self.ccd_redist.cdf(osiprange[0, :], loc=Etrue)
+        return upper - lower
 
     def apply_osip(self, inputarf, outpath, order, outroot='',
                    overwrite=False):
@@ -115,8 +171,9 @@ class OSIPBase(ABC):
         This function reads an input ARF file, which contains the
         effective area for a grating order in Arcus. For a given order
         sorting window, it then calculates what fraction of the
-        photons is lost. For example, if the OSIP is chosen to contain
-        the 90% energy fraction, then the new ARF values will be 0.9
+        photons is lost. For example, if the order-sorting regions can be
+        is chosen to contain  90% energy fraction, then the new ARF values
+        will be 0.9 (the integrated probability over the order-sorting region)
         times the input ARF.
 
         If the ``order`` of the new ARF differs from the order of the
@@ -349,7 +406,11 @@ class OSIPBase(ABC):
 class FixedWidthOSIP(OSIPBase):
     '''Modify ARF files to account for order-sorting effects
 
-    This is a base class that implements methods to modify ARF files
+    This class implements order sorting and integration of
+    the probabilities (OSIP) for order-sorting regions that have a fixed witdh
+    in energy.
+    This includes order-sorting of a photons list
+    (not yet implmented) and  methods to modify ARF files
     to account for order-sorting. Different diffraction orders fall on
     the same physical space on the CCD. The CCD energy resolution can
     then be used to assign photons to specific grating
@@ -357,7 +418,8 @@ class FixedWidthOSIP(OSIPBase):
     assingment is not perfect. Some photons may fall outside of the
     nominal energy used for order sorting and thus be lost, other may
     fall onto the energy assgined tothe different order. This class
-    modifies ARF files to correct for that.
+    modifies ARF files to correct for the integrated probability that a photon
+    falls inside the order-sorting region.
 
     Parameters
     ----------
@@ -366,7 +428,7 @@ class FixedWidthOSIP(OSIPBase):
         wavelength.
     offset_orders : list of int
         Offset from main order that is relevant.
-    sig_ccd : callable
+    ccd_redist : callable
         Function that return the width the Gaussian sigma of the CCD
         resolution, given an input energy.
     '''
@@ -387,7 +449,11 @@ class FixedWidthOSIP(OSIPBase):
 class FixedFractionOSIP(OSIPBase):
     '''Modify ARF files to account for order-sorting effects
 
-    This is a base class that implements methods to modify ARF files
+    This class implements order sorting and integration of
+    the probabilities (OSIP) for order sorting regions that contain a fixed
+    fraction of the photons in energy space.
+    This includes order-sorting of a photons list
+    (not yet implmented) and  methods to modify ARF files
     to account for order-sorting. Different diffraction orders fall on
     the same physical space on the CCD. The CCD energy resolution can
     then be used to assign photons to specific grating
@@ -395,7 +461,8 @@ class FixedFractionOSIP(OSIPBase):
     assingment is not perfect. Some photons may fall outside of the
     nominal energy used for order sorting and thus be lost, other may
     fall onto the energy assgined tothe different order. This class
-    modifies ARF files to correct for that.
+    modifies ARF files to correct for the integrated probability that a photon
+    falls inside the order-sorting region.
 
     Parameters
     ----------
@@ -406,7 +473,7 @@ class FixedFractionOSIP(OSIPBase):
         wavelength.
     offset_orders : list of int
         Offset from main order that is relevant.
-    sig_ccd : callable
+    ccd_redist : callable
         Function that return the width the Gaussian sigma of the CCD
         resolution, given an input energy.
     '''
@@ -419,16 +486,18 @@ class FixedFractionOSIP(OSIPBase):
         return 'OSIPFrac' + str(self.fraction)
 
     @u.quantity_input(chan_mid_nominal=u.keV, equivalencies=u.spectral())
-    def osip_tab(self, chan_mid_nominal, order):
-        halfwidth = norm.interval(self.fraction)[1] * self.sig_ccd(chan_mid_nominal)
-        return np.broadcast_to(halfwidth,
-                               (2, len(chan_mid_nominal)), subok=True)
+    def osip_range(self, chan_mid_nominal, order):
+        return self.ccd_redist.interval(self.fraction, loc=chan_mid_nominal)
 
 
 class FractionalDistanceOSIP(OSIPBase):
     '''Modify ARF files to account for order-sorting effects
 
-    This is a base class that implements methods to modify ARF files
+    This class implements order sorting and integration of
+    the probabilities (OSIP) for order sorting regions that fill a fixed
+    fraction of the energy space.
+    This includes order-sorting of a photons list
+    (not yet implmented) and  methods to modify ARF files
     to account for order-sorting. Different diffraction orders fall on
     the same physical space on the CCD. The CCD energy resolution can
     then be used to assign photons to specific grating
@@ -436,7 +505,8 @@ class FractionalDistanceOSIP(OSIPBase):
     assingment is not perfect. Some photons may fall outside of the
     nominal energy used for order sorting and thus be lost, other may
     fall onto the energy assgined tothe different order. This class
-    modifies ARF files to correct for that.
+    modifies ARF files to correct for the integrated probability that a photon
+    falls inside the order-sorting region.
 
     Parameters
     ----------
@@ -447,7 +517,7 @@ class FractionalDistanceOSIP(OSIPBase):
         order.
     offset_orders : list of int
         Offset from main order that is relevant.
-    sig_ccd : callable
+    ccd_redist : callable
         Function that return the width the Gaussian sigma of the CCD
         resolution, given an input energy.
     '''
@@ -462,8 +532,6 @@ class FractionalDistanceOSIP(OSIPBase):
     @u.quantity_input(chan_mid_nominal=u.keV, equivalencies=u.spectral())
     def osip_tab(self, chan_mid_nominal, order):
         energy = chan_mid_nominal.to(u.keV, equivalencies=u.spectral())
-        dE = energy * (((abs(order) + 1) / abs(order)) - 1)
-        inter = interp1d(energy, dE / 2 * self.fraction)
-        halfwidth = inter(energy) * dE.unit
-        return np.broadcast_to(halfwidth,
+        dE = energy / abs(order)
+        return np.broadcast_to(self.fraction / 2 * dE,
                                (2, len(chan_mid_nominal)), subok=True)

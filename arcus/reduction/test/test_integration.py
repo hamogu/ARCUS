@@ -21,6 +21,7 @@ import numpy as np
 import astropy.units as u
 from astropy.table import Table
 
+from arcus.instrument.ccd import CCDRedist
 from arcus.reduction import arfrmf, osip
 
 
@@ -29,14 +30,14 @@ def test_make_arf_osip():
     with TemporaryDirectory() as tmpdirname:
         # -5 is last, because we need that for the tests below
         for o in [-4, -6, -5]:
-           arf = arfrmf.mkarf([23, 24, 25, 26] * u.Angstrom, o)
-           arf = arfrmf.tagversion(arf)
+            arf = arfrmf.mkarf([23, 24, 25, 26] * u.Angstrom, o)
+            arf = arfrmf.tagversion(arf)
 
-           basearf = pjoin(tmpdirname,
-                           arfrmf.filename_from_meta('arf', **arf.meta))
-           arf.write(basearf)
+            basearf = pjoin(tmpdirname,
+                            arfrmf.filename_from_meta('arf', **arf.meta))
+            arf.write(basearf)
 
-        osipp = osip.FixedFractionOSIP(0.7)
+        osipp = osip.FixedFractionOSIP(0.7, ccd_redist=CCDRedist())
         osipp.apply_osip_all(tmpdirname, tmpdirname, [-5])
         # there are three confused arfs now (to be read below)
         assert len(glob(pjoin(tmpdirname, '*-*-*'))) == 3
