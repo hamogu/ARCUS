@@ -19,6 +19,7 @@ import logging
 import os
 import string
 from abc import ABC
+from glob import glob
 import numpy as np
 
 import astropy.units as u
@@ -216,7 +217,7 @@ class OSIPBase(ABC):
         arf.meta['CCDORDER'] = f'{order}'
         # some times there is no overlap and all elements become 0
         if np.all(arf['SPECRESP'] == 0):
-            logger.info(f'True refl order {m} does not contributed to ' +
+            logger.warning(f'True refl order {m} does not contribute to ' +
                         f'CCDORDER {order}. ' +
                         'Writing ARF with all entries equal to zero.')
         os.makedirs(outpath, exist_ok=True)
@@ -224,7 +225,7 @@ class OSIPBase(ABC):
                         arfrmf.filename_from_meta('arf', **arf.meta)),
                   overwrite=overwrite)
 
-    def write_readme(self, outpath, outroot=''):
+    def write_readme(self, outpath, outroot='', ARCCHAN='all'):
         '''Write README file to directory with ARFs
 
         Parameters
@@ -249,8 +250,13 @@ class OSIPBase(ABC):
                         'data', "osip_template.md")) as t:
             template = string.Template(t.read())
 
-        output = template.substitute(tagversion=tagstring)
-        with open(pjoin(outpath, outroot + "README.md"), "w") as f:
+        output = template.substitute(tagversion=tagstring,
+                                     description=f'{self.__class__}: {self.osip_description}',
+                                     offsetorders=self.offset_orders,
+                                     filenamemain=arfrmf.filename_from_meta(filetype='arf', ARCCHAN=ARCCHAN, ORDER=-4, CCDORDER=-4, TRUEORD=-4),
+                                     filenameupper=arfrmf.filename_from_meta(filetype='arf', ARCCHAN=ARCCHAN, ORDER=-4, CCDORDER=-4, TRUEORD=-5),
+                                     filenamelower=arfrmf.filename_from_meta(filetype='arf', ARCCHAN=ARCCHAN, ORDER=-4, CCDORDER=-4, TRUEORD=-3))
+        with open(pjoin(outpath, "README.md"), "w") as f:
             f.write(output)
 
     def plot_osip(self, ax, grid, order, **kwargs):
@@ -346,6 +352,36 @@ class OSIPBase(ABC):
         fig.savefig(pjoin(outpath, outroot + 'OSIP_regions.pdf'),
                     bbox_inches='tight')
 
+    def plot_summed_arf(self, path):
+        '''Generate a plot of the summed effective area.
+
+        This plot is not meant to convey detailed information, but rather
+        serve as a check for verification.
+
+        Parameters
+        ----------
+        path : string
+            Path to location of ARFs. The plot is written to the same file.
+        '''
+        wavegrid = np.arange(0, 60, .1) * u.Angstrom
+        specresp = np.zeros(len(wavegrid)) * u.cm**2
+        arflist = glob(pjoin(path, '*.arf'))
+        for f in arflist:
+            arf = arfrmf.ARF.read(f)
+            # Interpolate on common wavelength grid. Good enough for plotting.
+            # Interp requires sorted input
+            # but ARFs are reverse-sorted in wavelength
+            specresp += np.interp(wavegrid, arf['BIN_LO'][::-1],
+                                  arf['SPECRESP'][::-1])
+
+        fig, ax = plt.subplots()
+        ax.plot(wavegrid, specresp)
+        ax.set_xlabel(f'$\\lambda$ [{wavegrid.unit.to_string("latex_inline")}]')
+        ax.set_ylabel(f'effective area [{specresp.unit.to_string("latex_inline")}]')
+        ax.set_title('Combined effective area of all dispersed orders')
+        fig.savefig(pjoin(path, 'ARF_sum.pdf'),
+                    bbox_inches='tight')
+
     def apply_osip_all(self, inpath, outpath, orders,
                        inroot='', outroot='', ARCCHAN='all',
                        overwrite=False):
@@ -404,7 +440,8 @@ class OSIPBase(ABC):
         # The second condition checks that at least one ARF was written
         if HAS_PLT and (goodarf is not None):
             self.plot_summary(goodarf, orders, outpath, outroot)
-        self.write_readme(outpath, outroot)
+            self.plot_summed_arf(outpath)
+        self.write_readme(outpath, outroot, ARCCHAN=ARCCHAN)
 
 
 class FixedWidthOSIP(OSIPBase):
